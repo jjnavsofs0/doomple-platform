@@ -201,6 +201,7 @@ export default function UserDetailPage() {
   const canManageTarget = user.role !== "SUPER_ADMIN" || canManageSuperAdmin;
   const isDeletedAccount = user.isDeletedAccount || user.erasureRequest?.status === "ANONYMIZED";
   const canManageMutableAccount = canManageTarget && !isDeletedAccount;
+  const isOwnAccount = session?.user?.id === user.id;
 
   const handleSave = async () => {
     try {
@@ -515,7 +516,7 @@ export default function UserDetailPage() {
                       : "Mark Email Verified"}
                   </Button>
                 ) : null}
-                {canManageMutableAccount ? (
+                {canManageMutableAccount && !isOwnAccount ? (
                   <Button
                     type="button"
                     variant={user.isActive ? "outline" : "default"}
@@ -733,6 +734,7 @@ export default function UserDetailPage() {
 
               <div className="flex flex-wrap justify-between gap-3">
                 <div className="flex flex-wrap gap-3">
+                  {!isOwnAccount && (
                   <Button
                     type="button"
                     variant={user.isActive ? "outline" : "default"}
@@ -741,6 +743,7 @@ export default function UserDetailPage() {
                   >
                     {user.isActive ? "Deactivate User" : "Reactivate User"}
                   </Button>
+                  )}
                   <Button
                     type="button"
                     variant="outline"
