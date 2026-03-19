@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Plus, Users, Briefcase, FileText, TrendingUp, AlertCircle, ArrowUp } from "lucide-react";
 import { StatsCard } from "@/components/ui/stats-card";
@@ -46,7 +47,9 @@ const formatINR = (amount: number) => {
   }).format(amount);
 };
 
-export default function AdminDashboard() {
+function AdminDashboardContent() {
+  const searchParams = useSearchParams();
+  const isForbidden = searchParams.get("error") === "forbidden";
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -201,6 +204,14 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6 p-6 md:p-8">
+      {isForbidden && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+          <p className="text-sm text-red-700 font-medium">
+            You don&apos;t have permission to access that page. Contact your Super Admin if you need access.
+          </p>
+        </div>
+      )}
       <PageHeader
         title="Dashboard"
         description="Overview of business operations"
@@ -333,8 +344,7 @@ export default function AdminDashboard() {
                 <div className="h-2 bg-muted rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full"
-                    style={{ backgroundColor: "#1ABFAD" }}
-                    style={{ width: `${Math.min((count / 15) * 100, 100)}%` }}
+                    style={{ backgroundColor: "#1ABFAD", width: `${Math.min((count / 15) * 100, 100)}%` }}
                   />
                 </div>
               </div>
@@ -360,8 +370,7 @@ export default function AdminDashboard() {
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full"
-                      style={{ backgroundColor: "#3BB2F6" }}
-                      style={{ width: `${percentage}%` }}
+                      style={{ backgroundColor: "#3BB2F6", width: `${percentage}%` }}
                     />
                   </div>
                 </div>
@@ -410,5 +419,13 @@ export default function AdminDashboard() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function AdminDashboard() {
+  return (
+    <Suspense fallback={<div className="p-8 text-gray-500">Loading dashboard...</div>}>
+      <AdminDashboardContent />
+    </Suspense>
   );
 }

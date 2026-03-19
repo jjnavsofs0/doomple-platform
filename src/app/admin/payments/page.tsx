@@ -21,14 +21,24 @@ interface Payment {
   amount: number
   method: string
   razorpayPaymentId: string
-  status: "success" | "pending" | "failed"
+  status: "pending" | "processing" | "completed" | "failed" | "refunded"
   createdAt: string
 }
 
-const statusColors = {
-  success: "bg-green-100 text-green-800",
-  pending: "bg-yellow-100 text-yellow-800",
-  failed: "bg-red-100 text-red-800",
+const statusColors: Record<string, string> = {
+  completed: "bg-green-100 text-green-800",
+  pending:   "bg-yellow-100 text-yellow-800",
+  processing:"bg-blue-100 text-blue-800",
+  failed:    "bg-red-100 text-red-800",
+  refunded:  "bg-purple-100 text-purple-800",
+}
+
+const statusLabels: Record<string, string> = {
+  completed:  "Completed",
+  pending:    "Pending",
+  processing: "Processing",
+  failed:     "Failed",
+  refunded:   "Refunded",
 }
 
 const currencyFormatter = new Intl.NumberFormat("en-IN", {
@@ -76,11 +86,11 @@ export default function PaymentsPage() {
   })
 
   const totalCollected = payments
-    .filter((p) => p.status === "success")
+    .filter((p) => p.status === "completed")
     .reduce((sum, p) => sum + p.amount, 0)
 
   const totalPending = payments
-    .filter((p) => p.status === "pending")
+    .filter((p) => p.status === "pending" || p.status === "processing")
     .reduce((sum, p) => sum + p.amount, 0)
 
   const thisMonthCollected = payments
@@ -88,7 +98,7 @@ export default function PaymentsPage() {
       const paymentDate = new Date(p.createdAt)
       const now = new Date()
       return (
-        p.status === "success" &&
+        p.status === "completed" &&
         paymentDate.getMonth() === now.getMonth() &&
         paymentDate.getFullYear() === now.getFullYear()
       )
@@ -143,8 +153,8 @@ export default function PaymentsPage() {
       id: "status",
       header: "Status",
       accessor: (row: Payment) => (
-        <Badge className={statusColors[row.status as keyof typeof statusColors]}>
-          {row.status}
+        <Badge className={statusColors[row.status] ?? "bg-gray-100 text-gray-800"}>
+          {statusLabels[row.status] ?? row.status}
         </Badge>
       ),
       sortable: true,
@@ -174,7 +184,7 @@ export default function PaymentsPage() {
               {currencyFormatter.format(totalCollected)}
             </p>
             <p className="mt-1 text-xs text-gray-600">
-              {payments.filter((p) => p.status === "success").length} successful payments
+              {payments.filter((p) => p.status === "completed").length} completed payments
             </p>
           </CardContent>
         </Card>
@@ -190,7 +200,7 @@ export default function PaymentsPage() {
               {currencyFormatter.format(totalPending)}
             </p>
             <p className="mt-1 text-xs text-gray-600">
-              {payments.filter((p) => p.status === "pending").length} pending payments
+              {payments.filter((p) => p.status === "pending" || p.status === "processing").length} pending / processing
             </p>
           </CardContent>
         </Card>
@@ -245,9 +255,11 @@ export default function PaymentsPage() {
                 className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
               >
                 <option value="">All Statuses</option>
-                <option value="success">Success</option>
+                <option value="completed">Completed</option>
                 <option value="pending">Pending</option>
+                <option value="processing">Processing</option>
                 <option value="failed">Failed</option>
+                <option value="refunded">Refunded</option>
               </select>
             </div>
           </div>
