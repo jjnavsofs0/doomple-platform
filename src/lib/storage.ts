@@ -1,0 +1,158 @@
+import { randomUUID } from "crypto";
+import { mkdir, rm, writeFile } from "fs/promises";
+import path from "path";
+import { PutObjectCommand, DeleteObjectCommand, GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+
+const LOCAL_UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
+type StorageVisibility = "public" | "private";
+
+function sanitizeFileName(fileName: string) {
+  return fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
+}
+
+function getS3Client() {
+  if (!process.env.AWS_REGION) {
+    return null;
+  }
+
+  return new S3Client({
+    region: process.env.AWS_REGION,
+    credentials:
+      process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+        ? {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+          }
+        : undefined,
+  });
+}
+
+function getBucketName(visibility: StorageVisibility) {
+  if (visibility === "public") {
+    return process.env.AWS_S3_PUBLIC_BUCKET || process.env.AWS_S3_BUCKET || "";
+  }
+
+  return process.env.AWS_S3_PRIVATE_BUCKET || process.env.AWS_S3_BUCKET || "";
+}
+
+export function getStorageIntegrationStatus() {
+  return {
+    region: process.env.AWS_REGION || "",
+    publicBucket: getBucketName("public"),
+    privateBucket: getBucketName("private"),
+    publicBucketConfigured: Boolean(getBucketName("public")),
+    privateBucketConfigured: Boolean(getBucketName("private")),
+  };
+}
+
+export function isS3Configured() {
+  const status = getStorageIntegrationStatus();
+  return Boolean(getS3Client() && (status.publicBucketConfigured || status.privateBucketConfigured));
+}
+
+export async function uploadFile(params: {
+  buffer: Buffer;
+  fileName: string;
+  contentType?: string;
+  folder: string;
+  visibility?: StorageVisibility;
+}) {
+  const visibility = params.visibility || "private";
+  const safeName = sanitizeFileName(params.fileName);
+  const storageKey = `${params.folder}/${Date.now()}-${randomUUID()}-${safeName}`;
+  const s3Client = getS3Client();
+  const bucket = getBucketName(visibility);
+
+  if (s3Client && bucket) {
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: storageKey,
+        Body: params.buffer,
+        ContentType: params.contentType || "application/octet-stream",
+      })
+    );
+
+    return {
+      provider: `s3-${visibility}`,
+      storageKey,
+      url:
+        visibility === "public"
+          ? `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${storageKey}`
+          : "",
+    };
+  }
+
+  const destination = path.join(LOCAL_UPLOAD_DIR, storageKey);
+  await mkdir(path.dirname(destination), { recursive: true });
+  await writeFile(destination, params.buffer);
+
+  return {
+    provider: "local",
+    storageKey,
+    url: `/uploads/${storageKey}`,
+  };
+}
+
+export async function deleteStoredFile(
+  provider: string,
+  storageKey?: string | null
+) {
+  if (!storageKey) {
+    return;
+  }
+
+  if (provider.startsWith("s3-")) {
+    const s3Client = getS3Client();
+    const bucket = getBucketName(provider === "s3-public" ? "public" : "private");
+    if (s3Client && bucket) {
+      await s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: bucket,
+          Key: storageKey,
+        })
+      );
+    }
+    return;
+  }
+
+  const destination = path.join(LOCAL_UPLOAD_DIR, storageKey);
+  await rm(destination, { force: true });
+}
+
+export async function getStoredFileUrl(params: {
+  id: string;
+  provider: string;
+  storageKey?: string | null;
+  fallbackUrl?: string | null;
+}) {
+  if (params.provider === "s3-public" && params.storageKey) {
+    const bucket = getBucketName("public");
+    if (bucket && process.env.AWS_REGION) {
+      return `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${params.storageKey}`;
+    }
+  }
+
+  if (params.provider === "s3-private" && params.storageKey) {
+    const s3Client = getS3Client();
+    const bucket = getBucketName("private");
+
+    if (s3Client && bucket) {
+      return getSignedUrl(
+        s3Client,
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: params.storageKey,
+        }),
+        { expiresIn: 60 * 10 }
+      );
+    }
+  }
+
+  if (params.provider === "local" && params.storageKey) {
+    return `/uploads/${params.storageKey}`;
+  }
+
+  return params.fallbackUrl || `/api/files/${params.id}/download`;
+}
