@@ -40,6 +40,33 @@ export const DEFAULT_APP_SETTINGS = {
       invoiceEmailSubject: "Invoice {{invoiceNumber}} from Doomple",
     },
   },
+  payment_gateway_settings: {
+    group: "billing",
+    label: "Payment Gateways",
+    description: "Map enabled gateways to the currencies they can process.",
+    value: {
+      gateways: [
+        {
+          key: "RAZORPAY",
+          label: "Razorpay",
+          enabled: true,
+          supportedCurrencies: ["INR"],
+        },
+        {
+          key: "BANK_TRANSFER",
+          label: "Bank Transfer",
+          enabled: true,
+          supportedCurrencies: ["INR", "USD", "EUR", "GBP", "AED", "SGD", "AUD", "CAD"],
+        },
+        {
+          key: "MANUAL",
+          label: "Manual Collection",
+          enabled: true,
+          supportedCurrencies: ["INR", "USD", "EUR", "GBP", "AED", "SGD", "AUD", "CAD"],
+        },
+      ],
+    },
+  },
 } as const;
 
 type AppSettingKey = keyof typeof DEFAULT_APP_SETTINGS;

@@ -5,17 +5,55 @@ import { getSession, signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Lock, Loader2, Mail, ShieldCheck, Sparkles } from "lucide-react";
+import { DoompleLogo } from "@/components/ui/doomple-logo";
 
 function LoginPageContent() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const callbackUrlParam = searchParams.get("callbackUrl");
   const callbackPath =
     callbackUrlParam && callbackUrlParam.startsWith("/") ? callbackUrlParam : "/admin";
+
+  useEffect(() => {
+    let active = true;
+
+    const redirectIfAuthenticated = async () => {
+      try {
+        const session = await getSession();
+        if (!active) {
+          return;
+        }
+
+        if (session?.user?.id) {
+          const role = session.user.role || "";
+          const fallbackPath = role === "CLIENT" ? "/portal" : "/admin";
+          const destination =
+            callbackUrlParam && callbackUrlParam.startsWith("/")
+              ? callbackPath
+              : fallbackPath;
+
+          window.location.replace(destination);
+          return;
+        }
+      } finally {
+        if (active) {
+          setIsCheckingSession(false);
+        }
+      }
+    };
+
+    void redirectIfAuthenticated();
+
+    return () => {
+      active = false;
+    };
+  }, [callbackPath, callbackUrlParam]);
 
   const submitCredentials = async () => {
     setError(null);
@@ -57,8 +95,18 @@ function LoginPageContent() {
 
   useEffect(() => {
     const errorParam = searchParams.get("error");
+    const emailChangeStatus = searchParams.get("emailChange");
     if (errorParam) {
       setError("Invalid credentials. Please try again.");
+    }
+    if (emailChangeStatus === "verified") {
+      setSuccess("Your new email has been verified. You can now sign in with it.");
+    } else if (emailChangeStatus === "expired") {
+      setError("That email verification link has expired. Request the change again from your profile.");
+    } else if (emailChangeStatus === "duplicate") {
+      setError("That email address is already in use by another account.");
+    } else if (emailChangeStatus === "invalid" || emailChangeStatus === "error") {
+      setError("We could not verify that email change link.");
     }
   }, [searchParams]);
 
@@ -67,18 +115,34 @@ function LoginPageContent() {
     await submitCredentials();
   };
 
+  if (isCheckingSession) {
+    return (
+      <div className="min-h-screen bg-[linear-gradient(180deg,#031B37_0%,#08274A_58%,#F4F7FB_58%,#F4F7FB_100%)] px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-md items-center justify-center">
+          <div className="rounded-[28px] border border-[#DCE6F3] bg-white p-8 text-center shadow-[0_30px_80px_rgba(4,32,66,0.10)]">
+            <Loader2 className="mx-auto h-6 w-6 animate-spin text-[#042042]" />
+            <p className="mt-4 text-sm font-medium text-[#374151]">
+              Checking your session...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#031B37_0%,#08274A_42%,#F4F7FB_42%,#F4F7FB_100%)] px-4 py-10 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#031B37_0%,#08274A_58%,#F4F7FB_58%,#F4F7FB_100%)] px-4 py-10 sm:px-6 lg:px-8">
       <div className="mx-auto grid min-h-[calc(100vh-5rem)] w-full max-w-6xl items-center gap-8 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="hidden rounded-[28px] border border-white/10 bg-white/5 p-10 text-white shadow-2xl backdrop-blur lg:block">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-1.5 text-sm font-medium text-[#7CE6DA]">
+        <div className="hidden rounded-[28px] border border-white/12 bg-[linear-gradient(180deg,#17375D_0%,#0B2949_100%)] p-10 text-white shadow-[0_28px_80px_rgba(3,27,55,0.28)] lg:block">
+          <DoompleLogo variant="full" theme="dark" size={42} />
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/10 px-4 py-1.5 text-sm font-medium text-[#8CF1E2]">
             <Sparkles className="h-4 w-4" />
             Client workspace and admin operations
           </div>
           <h1 className="mt-6 max-w-lg text-5xl font-bold leading-tight">
             Sign in to manage delivery, projects, invoices, and client communication.
           </h1>
-          <p className="mt-5 max-w-xl text-base leading-7 text-white/70">
+          <p className="mt-5 max-w-xl text-base leading-7 text-white/78">
             One secure access point for Doomple admins and clients, with role-aware routing after sign in.
           </p>
 
@@ -89,11 +153,11 @@ function LoginPageContent() {
               "Keep delivery updates and approvals moving with less back-and-forth.",
               "Use a cleaner, more premium sign-in experience that matches the brand.",
             ].map((item) => (
-              <div key={item} className="rounded-2xl border border-white/10 bg-[#0B2E55]/70 p-5">
-                <div className="mb-3 inline-flex rounded-xl bg-white/10 p-2 text-[#7CE6DA]">
+              <div key={item} className="rounded-2xl border border-white/12 bg-[rgba(255,255,255,0.08)] p-5">
+                <div className="mb-3 inline-flex rounded-xl bg-white/10 p-2 text-[#8CF1E2]">
                   <ShieldCheck className="h-4 w-4" />
                 </div>
-                <p className="text-sm leading-6 text-white/70">{item}</p>
+                <p className="text-sm leading-6 text-white/80">{item}</p>
               </div>
             ))}
           </div>
@@ -102,14 +166,14 @@ function LoginPageContent() {
         <div className="w-full">
           <div className="mx-auto max-w-md">
             <div className="mb-8 text-center lg:text-left">
-              <div className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-br from-[#1ABFAD] to-[#3BB2F6] p-3 shadow-lg shadow-cyan-500/20">
-                <span className="text-xl font-bold text-white">D</span>
+              <div className="inline-flex items-center justify-center rounded-3xl border border-[#CFE1F4] bg-[linear-gradient(180deg,#FFFFFF_0%,#F4F8FD_100%)] px-5 py-3 shadow-[0_18px_40px_rgba(4,32,66,0.12)]">
+                <DoompleLogo variant="full" theme="light" size={34} />
               </div>
-              <p className="mt-4 text-sm font-medium uppercase tracking-[0.28em] text-[#1ABFAD]">
+              <p className="mt-4 text-sm font-medium uppercase tracking-[0.28em] text-[#66E6D8] lg:text-[#66E6D8]">
                 Secure Access
               </p>
-              <h2 className="mt-3 text-3xl font-bold text-[#042042]">Welcome to Doomple</h2>
-              <p className="mt-2 text-sm leading-6 text-[#6B7280]">
+              <h2 className="mt-3 text-3xl font-bold text-white lg:text-white">Welcome to Doomple</h2>
+              <p className="mt-2 text-sm leading-6 text-white/72 lg:text-white/72">
                 Enter your credentials to continue to the right workspace.
               </p>
             </div>
@@ -130,6 +194,12 @@ function LoginPageContent() {
                 </div>
               )}
 
+              {success && (
+                <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                  <p className="text-sm font-medium text-emerald-800">{success}</p>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
                   <label htmlFor="email" className="mb-2 block text-sm font-medium text-[#374151]">
@@ -144,7 +214,7 @@ function LoginPageContent() {
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="you@example.com"
                       required
-                      disabled={isLoading}
+                      disabled={isLoading || isCheckingSession}
                       className="w-full rounded-2xl border border-[#D7E3F0] bg-[#F8FBFF] py-3 pl-12 pr-4 text-[#042042] outline-none transition-all focus:border-[#1ABFAD] focus:bg-white focus:ring-2 focus:ring-[#1ABFAD]/20 disabled:cursor-not-allowed disabled:opacity-70"
                     />
                   </div>
@@ -163,7 +233,7 @@ function LoginPageContent() {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
                       required
-                      disabled={isLoading}
+                      disabled={isLoading || isCheckingSession}
                       className="w-full rounded-2xl border border-[#D7E3F0] bg-[#F8FBFF] py-3 pl-12 pr-4 text-[#042042] outline-none transition-all focus:border-[#1ABFAD] focus:bg-white focus:ring-2 focus:ring-[#1ABFAD]/20 disabled:cursor-not-allowed disabled:opacity-70"
                     />
                   </div>
@@ -174,7 +244,7 @@ function LoginPageContent() {
                   onClick={() => {
                     void submitCredentials();
                   }}
-                  disabled={isLoading}
+                  disabled={isLoading || isCheckingSession}
                   className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#042042] px-4 py-3.5 text-sm font-semibold text-white transition-all hover:bg-[#07315F] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isLoading ? (

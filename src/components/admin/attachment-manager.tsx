@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/toast";
 import { Upload, Download, Trash2, FileText } from "lucide-react";
 
 type Attachment = {
@@ -27,6 +28,7 @@ export function AttachmentManager(props: {
   entityId: string;
   emptyMessage?: string;
 }) {
+  const { toast } = useToast();
   const [files, setFiles] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -83,8 +85,19 @@ export function AttachmentManager(props: {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+      toast({
+        type: "success",
+        title: "Files uploaded",
+        description: `${selectedFiles.length} file(s) uploaded successfully.`,
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to upload files");
+      const message = err instanceof Error ? err.message : "Failed to upload files";
+      setError(message);
+      toast({
+        type: "error",
+        title: "Could not upload files",
+        description: message,
+      });
     } finally {
       setUploading(false);
     }
@@ -102,8 +115,19 @@ export function AttachmentManager(props: {
       }
 
       setFiles((current) => current.filter((file) => file.id !== fileId));
+      toast({
+        type: "success",
+        title: "File deleted",
+        description: "The file was removed successfully.",
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete file");
+      const message = err instanceof Error ? err.message : "Failed to delete file";
+      setError(message);
+      toast({
+        type: "error",
+        title: "Could not delete file",
+        description: message,
+      });
     }
   };
 

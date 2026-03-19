@@ -48,6 +48,7 @@ export default function EditProjectPage() {
         setInitialData({
           name: project.name || "",
           clientId: project.clientId || "",
+          currency: project.currency || "INR",
           category: project.category || "CUSTOM_DEVELOPMENT",
           description: project.description || "",
           scope: project.scope || "",

@@ -72,6 +72,35 @@ export async function GET(request: Request) {
       (i) => i.status !== "PAID" && i.status !== "CANCELLED"
     ).length;
 
+    const revenueThisMonthByCurrency = invoices.reduce(
+      (acc, invoice) => {
+        const current = new Date();
+        const created = new Date(invoice.createdAt);
+        if (
+          created.getMonth() === current.getMonth() &&
+          created.getFullYear() === current.getFullYear() &&
+          invoice.status === "PAID"
+        ) {
+          const currency = invoice.currency || "INR";
+          acc[currency] = (acc[currency] || 0) + Number(invoice.total);
+        }
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    const outstandingByCurrency = invoices.reduce(
+      (acc, invoice) => {
+        if (invoice.status !== "PAID" && invoice.status !== "CANCELLED") {
+          const currency = invoice.currency || "INR";
+          acc[currency] =
+            (acc[currency] || 0) + Number(invoice.total) - Number(invoice.paidAmount);
+        }
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
     const outstandingAmount = invoices
       .filter((i) => i.status !== "PAID" && i.status !== "CANCELLED")
       .reduce((sum, i) => sum + Number(i.total) - Number(i.paidAmount), 0);
@@ -96,6 +125,30 @@ export async function GET(request: Request) {
       {} as Record<string, number>
     );
 
+    const projectMixByCategory = projects.reduce(
+      (acc, project) => {
+        acc[project.category] = (acc[project.category] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    const invoiceStatusSummary = invoices.reduce(
+      (acc, invoice) => {
+        acc[invoice.status] = (acc[invoice.status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    const projectStatusSummary = projects.reduce(
+      (acc, project) => {
+        acc[project.status] = (acc[project.status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
     return NextResponse.json({
       success: true,
       data: {
@@ -109,6 +162,11 @@ export async function GET(request: Request) {
         recentProjects,
         pipelineSummary,
         revenueByCategory,
+        revenueThisMonthByCurrency,
+        outstandingByCurrency,
+        projectMixByCategory,
+        invoiceStatusSummary,
+        projectStatusSummary,
         // preserve typed sub-objects for other dashboard views
         sales: {
           totalLeads: leads.length,
@@ -116,8 +174,20 @@ export async function GET(request: Request) {
           conversionRate,
           pipelineSummary,
         },
-        projects: { total: projects.length, active: activeProjects },
-        billing: { openInvoices, outstandingAmount, revenueThisMonth },
+        projects: {
+          total: projects.length,
+          active: activeProjects,
+          byStatus: projectStatusSummary,
+          byCategory: projectMixByCategory,
+        },
+        billing: {
+          openInvoices,
+          outstandingAmount,
+          revenueThisMonth,
+          outstandingByCurrency,
+          revenueThisMonthByCurrency,
+          byStatus: invoiceStatusSummary,
+        },
       },
     });
   } catch (error) {

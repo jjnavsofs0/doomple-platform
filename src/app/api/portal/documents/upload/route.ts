@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getPortalClient } from "@/lib/portal";
 import { FILE_LIMITS } from "@/lib/constants";
 import { uploadFile } from "@/lib/storage";
+import { broadcastUserRefresh, notifyAdmins } from "@/lib/realtime";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,23 @@ export async function POST(request: Request) {
         url,
       });
     }
+
+    await notifyAdmins({
+      title: "Client documents uploaded",
+      message: `${uploadedFiles.length} new document${uploadedFiles.length === 1 ? "" : "s"} were uploaded for ${portalClient.client.companyName || portalClient.client.email}.`,
+      type: "PROJECT",
+      link: `/admin/clients/${portalClient.client.id}`,
+      topics: ["clients", "notifications"],
+      metadata: {
+        clientId: portalClient.client.id,
+        uploadCount: uploadedFiles.length,
+      },
+    });
+
+    await broadcastUserRefresh([portalClient.user.id], ["documents", "notifications"], {
+      clientId: portalClient.client.id,
+      uploadCount: uploadedFiles.length,
+    });
 
     return NextResponse.json({
       success: true,

@@ -1,344 +1,429 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Button,
-  Badge,
-  Skeleton,
-  DataTable,
-  PageHeader,
-} from "@/components/ui"
-import type { ColumnDef } from "@/components/ui/data-table"
-import { ChevronRight, Plus } from "lucide-react"
+  AlertTriangle,
+  ArrowRight,
+  CircleDollarSign,
+  FileSpreadsheet,
+  Plus,
+  RefreshCcw,
+  Search,
+  WalletCards,
+} from "lucide-react"
+import { format } from "date-fns"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Select } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
+import { StatusBadge } from "@/components/ui/status-badge"
+import { useAdminLiveRefetch } from "@/hooks/use-live-refetch"
+import { cn, formatCurrency } from "@/lib/utils"
 
 interface Invoice {
   id: string
   invoiceNumber: string
   clientName: string
-  projectName?: string
+  projectName?: string | null
   issueDate: string
   dueDate: string
   total: number
   amountPaid: number
+  currency?: string
   status: "Draft" | "Sent" | "Partially Paid" | "Paid" | "Overdue" | "Cancelled"
   billingCategory: string
   createdAt: string
 }
 
-const statusColors = {
-  Draft: "bg-gray-100 text-gray-800",
-  Sent: "bg-blue-100 text-blue-800",
-  "Partially Paid": "bg-yellow-100 text-yellow-800",
-  Paid: "bg-green-100 text-green-800",
-  Overdue: "bg-red-100 text-red-800",
-  Cancelled: "bg-orange-100 text-orange-800",
-}
+const summaryCardStyles = [
+  "from-emerald-50 to-white border-emerald-100",
+  "from-amber-50 to-white border-amber-100",
+  "from-rose-50 to-white border-rose-100",
+  "from-sky-50 to-white border-sky-100",
+]
 
-const currencyFormatter = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-})
+const statusColorMap = {
+  draft: "outline",
+  sent: "default",
+  partially_paid: "warning",
+  paid: "success",
+  overdue: "destructive",
+  cancelled: "outline",
+} as const
 
 export default function InvoicesPage() {
   const router = useRouter()
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState("")
-  const [categoryFilter, setCategoryFilter] = useState("")
+  const [invoices, setInvoices] = React.useState<Invoice[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = React.useState("")
+  const [filters, setFilters] = React.useState({ status: "", category: "" })
 
-  useEffect(() => {
-    fetchInvoices()
-  }, [])
-
-  const fetchInvoices = async () => {
+  const fetchInvoices = React.useCallback(async () => {
     try {
-      setLoading(true)
+      setIsLoading(true)
       setError(null)
-      const response = await fetch("/api/invoices")
-      if (!response.ok) throw new Error("Failed to fetch invoices")
+      const response = await fetch("/api/invoices?limit=250", { cache: "no-store" })
+      if (!response.ok) {
+        throw new Error("Failed to fetch invoices")
+      }
+
       const data = await response.json()
       setInvoices(data.data || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
+      setInvoices([])
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
-  }
+  }, [])
 
-  const filteredInvoices = invoices.filter((inv) => {
-    const matchesSearch = searchTerm
-      ? inv.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inv.clientName.toLowerCase().includes(searchTerm.toLowerCase())
-      : true
+  React.useEffect(() => {
+    fetchInvoices()
+  }, [fetchInvoices])
 
-    const matchesStatus = statusFilter ? inv.status === statusFilter : true
-    const matchesCategory = categoryFilter ? inv.billingCategory === categoryFilter : true
+  useAdminLiveRefetch(["dashboard", "invoices", "payments"], fetchInvoices)
 
-    return matchesSearch && matchesStatus && matchesCategory
-  })
+  const options = React.useMemo(() => {
+    const statusOptions = [
+      { value: "", label: "All statuses" },
+      ...Array.from(new Set(invoices.map((invoice) => invoice.status))).map((value) => ({
+        value,
+        label: value,
+      })),
+    ]
 
-  const uniqueCategories = Array.from(new Set(invoices.map((inv) => inv.billingCategory)))
-  const uniqueStatuses = Array.from(new Set(invoices.map((inv) => inv.status)))
+    const categoryOptions = [
+      { value: "", label: "All categories" },
+      ...Array.from(new Set(invoices.map((invoice) => invoice.billingCategory).filter(Boolean))).map((value) => ({
+        value,
+        label: value,
+      })),
+    ]
 
-  const isOverdue = (invoice: Invoice) => {
-    return invoice.status === "Overdue" || (new Date(invoice.dueDate) < new Date() && invoice.status !== "Paid")
-  }
+    return { statusOptions, categoryOptions }
+  }, [invoices])
 
-  const columns: ColumnDef<Invoice>[] = [
-    {
-      id: "invoiceNumber",
-      header: "Invoice #",
-      accessor: (row: Invoice) => row.invoiceNumber,
-      sortable: true,
-    },
-    {
-      id: "clientName",
-      header: "Client",
-      accessor: (row: Invoice) => row.clientName,
-      sortable: true,
-    },
-    {
-      id: "projectName",
-      header: "Project",
-      accessor: (row: Invoice) => row.projectName || "-",
-      sortable: true,
-    },
-    {
-      id: "issueDate",
-      header: "Issue Date",
-      accessor: (row: Invoice) => new Date(row.issueDate).toLocaleDateString("en-IN"),
-      sortable: true,
-    },
-    {
-      id: "dueDate",
-      header: "Due Date",
-      accessor: (row: Invoice) => new Date(row.dueDate).toLocaleDateString("en-IN"),
-      sortable: true,
-    },
-    {
-      id: "total",
-      header: "Total",
-      accessor: (row: Invoice) => currencyFormatter.format(row.total),
-      sortable: true,
-    },
-    {
-      id: "status",
-      header: "Status",
-      accessor: (row: Invoice) => (
-        <Badge className={statusColors[row.status as keyof typeof statusColors]}>
-          {row.status}
-        </Badge>
+  const filteredInvoices = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+
+    return invoices.filter((invoice) => {
+      if (filters.status && invoice.status !== filters.status) return false
+      if (filters.category && invoice.billingCategory !== filters.category) return false
+
+      if (!query) return true
+
+      return [
+        invoice.invoiceNumber,
+        invoice.clientName,
+        invoice.projectName || "",
+        invoice.billingCategory,
+        invoice.status,
+      ].some((value) => value.toLowerCase().includes(query))
+    })
+  }, [filters.category, filters.status, invoices, searchQuery])
+
+  const sumByCurrency = React.useCallback(
+    (rows: Invoice[], selector: (invoice: Invoice) => number) =>
+      Object.entries(
+        rows.reduce<Record<string, number>>((acc, row) => {
+          const currency = row.currency || "INR"
+          acc[currency] = (acc[currency] || 0) + selector(row)
+          return acc
+        }, {})
       ),
-      sortable: true,
-    },
-    {
-      id: "payment",
-      header: "Payment",
-      accessor: (row: Invoice) => {
-        const pending = row.total - row.amountPaid
-        return (
-          <div className="text-sm">
-            <p className="text-green-600 font-medium">{currencyFormatter.format(row.amountPaid)}</p>
-            <p className="text-orange-600 text-xs">{currencyFormatter.format(pending)} pending</p>
-          </div>
-        )
+    []
+  )
+
+  const summary = React.useMemo(() => {
+    const openInvoices = invoices.filter((invoice) => !["Paid", "Cancelled"].includes(invoice.status))
+    const overdueInvoices = invoices.filter((invoice) => invoice.status === "Overdue")
+    const issuedThisMonth = invoices.filter((invoice) => {
+      const current = new Date()
+      const issued = new Date(invoice.issueDate)
+      return issued.getMonth() === current.getMonth() && issued.getFullYear() === current.getFullYear()
+    })
+
+    return [
+      {
+        label: "Collected",
+        value:
+          sumByCurrency(invoices, (invoice) => invoice.amountPaid)
+            .map(([currency, total]) => formatCurrency(total, currency))
+            .join(" · ") || formatCurrency(0, "INR"),
+        helper: `${invoices.filter((invoice) => invoice.status === "Paid").length} fully paid invoices`,
+        icon: CircleDollarSign,
       },
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      accessor: (row: Invoice) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push(`/admin/invoices/${row.id}`)}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      ),
-    },
-  ]
+      {
+        label: "Outstanding",
+        value:
+          sumByCurrency(openInvoices, (invoice) => invoice.total - invoice.amountPaid)
+            .map(([currency, total]) => formatCurrency(total, currency))
+            .join(" · ") || formatCurrency(0, "INR"),
+        helper: `${openInvoices.length} invoices still open for collection`,
+        icon: WalletCards,
+      },
+      {
+        label: "Overdue",
+        value: overdueInvoices.length,
+        helper: "Invoices needing immediate billing follow-up",
+        icon: AlertTriangle,
+      },
+      {
+        label: "Issued this month",
+        value: issuedThisMonth.length,
+        helper: format(new Date(), "MMMM yyyy"),
+        icon: FileSpreadsheet,
+      },
+    ]
+  }, [invoices, sumByCurrency])
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Invoices"
-        action={
-          <Link href="/admin/invoices/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Invoice
-            </Button>
-          </Link>
-        }
-      />
+  const activeFilters = React.useMemo(
+    () => [searchQuery, filters.status, filters.category].filter(Boolean).length,
+    [filters.category, filters.status, searchQuery]
+  )
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Collected</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">
-              {currencyFormatter.format(
-                invoices.reduce((sum, inv) => sum + inv.amountPaid, 0)
-              )}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Pending</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">
-              {currencyFormatter.format(
-                invoices.reduce((sum, inv) => sum + (inv.total - inv.amountPaid), 0)
-              )}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">This Month</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">
-              {currencyFormatter.format(
-                invoices
-                  .filter((inv) => {
-                    const invDate = new Date(inv.issueDate)
-                    const now = new Date()
-                    return (
-                      invDate.getMonth() === now.getMonth() &&
-                      invDate.getFullYear() === now.getFullYear()
-                    )
-                  })
-                  .reduce((sum, inv) => sum + inv.amountPaid, 0)
-              )}
-            </p>
-          </CardContent>
+  if (error) {
+    return (
+      <div className="mx-auto max-w-7xl space-y-6 p-6">
+        <Card className="border-destructive/40 bg-destructive/5 p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-medium text-destructive">Invoices area unavailable</p>
+              <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={fetchInvoices}>
+                <RefreshCcw className="mr-2 h-4 w-4" />
+                Retry
+              </Button>
+              <Link href="/admin/invoices/new">
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Invoice
+                </Button>
+              </Link>
+            </div>
+          </div>
         </Card>
       </div>
+    )
+  }
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Search & Filter</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Search</label>
-              <input
-                type="text"
-                placeholder="Invoice # or client..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              />
+  return (
+    <div className="mx-auto max-w-7xl space-y-6 p-6">
+      <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-white shadow-xl">
+        <div className="grid gap-8 px-6 py-7 md:px-8 lg:grid-cols-[1.18fr_1fr] lg:items-end">
+          <div className="space-y-5">
+            <Badge variant="outline" className="w-fit border-white/20 text-white/90">
+              Billing workspace
+            </Badge>
+            <div className="space-y-3">
+              <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
+                See what has been billed, what is waiting, and what needs action before collections slip.
+              </h1>
+              <p className="max-w-2xl text-sm leading-6 text-white/72 md:text-base">
+                Keep invoice status, client exposure, and payment progress visible from one cleaner billing view.
+              </p>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Status</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              >
-                <option value="">All Statuses</option>
-                {uniqueStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Category</label>
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              >
-                <option value="">All Categories</option>
-                {uniqueCategories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
+            <div className="flex flex-wrap gap-3">
+              <Link href="/admin/audit">
+                <Button variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white">
+                  Audit Log
+                </Button>
+              </Link>
+              <Link href="/admin/invoices/new">
+                <Button className="bg-white text-slate-900 hover:bg-white/90">
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Invoice
+                </Button>
+              </Link>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {error && (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="pt-6 text-red-800">{error}</CardContent>
-        </Card>
-      )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {summary.map((item, index) => {
+              const Icon = item.icon
 
-      {/* Invoices Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Invoices</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
+              return (
+                <div
+                  key={item.label}
+                  className={cn(
+                    "rounded-3xl border bg-gradient-to-br p-5 text-slate-900",
+                    summaryCardStyles[index]
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium text-slate-600">{item.label}</p>
+                    <Icon className="h-5 w-5 text-slate-500" />
+                  </div>
+                  <p className="mt-4 text-2xl font-semibold tracking-tight md:text-3xl">{item.value}</p>
+                  <p className="mt-2 text-sm leading-5 text-slate-600">{item.helper}</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      <Card className="rounded-[28px] border-slate-200 shadow-sm">
+        <div className="space-y-5 border-b border-slate-100 p-6">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight text-slate-900">Invoice queue</h2>
+              <p className="text-sm text-muted-foreground">
+                Search by invoice, client, project, or billing category and move directly into the invoice workspace.
+              </p>
             </div>
-          ) : invoices.length === 0 ? (
-            <div className="py-8 text-center text-gray-500">
-              No invoices found. Create one to get started.
+            {activeFilters > 0 && (
+              <Button
+                variant="ghost"
+                className="justify-start text-slate-600 hover:text-slate-900"
+                onClick={() => {
+                  setSearchQuery("")
+                  setFilters({ status: "", category: "" })
+                }}
+              >
+                Reset filters
+              </Button>
+            )}
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[1.25fr_0.8fr_0.8fr]">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search by invoice number, client, project, or category"
+                className="h-11 rounded-2xl border-slate-200 bg-slate-50 pl-10"
+              />
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    {columns.map((col) => (
-                      <th key={col.id} className="px-4 py-3 text-left font-medium text-gray-700">
-                        {col.header}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredInvoices.map((invoice) => (
-                    <tr
-                      key={invoice.id}
-                      className={`border-b border-gray-200 hover:bg-gray-50 ${
-                        isOverdue(invoice) ? "bg-red-50" : ""
-                      }`}
-                    >
-                      {columns.map((col) => (
-                        <td key={col.id} className="px-4 py-3">
-                          {col.accessor(invoice)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <Select
+              value={filters.status}
+              onValueChange={(value) => setFilters((current) => ({ ...current, status: value }))}
+              className="h-11 rounded-2xl border-slate-200 bg-slate-50"
+              options={options.statusOptions}
+            />
+            <Select
+              value={filters.category}
+              onValueChange={(value) => setFilters((current) => ({ ...current, category: value }))}
+              className="h-11 rounded-2xl border-slate-200 bg-slate-50"
+              options={options.categoryOptions}
+            />
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="space-y-4 p-6">
+            <Skeleton className="h-32 rounded-3xl" />
+            <Skeleton className="h-32 rounded-3xl" />
+            <Skeleton className="h-32 rounded-3xl" />
+          </div>
+        ) : filteredInvoices.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
+            <div className="rounded-full bg-slate-100 p-4 text-slate-500">
+              <FileSpreadsheet className="h-6 w-6" />
             </div>
-          )}
-        </CardContent>
+            <div className="space-y-1">
+              <h3 className="text-lg font-semibold text-slate-900">No invoices match these filters</h3>
+              <p className="text-sm text-muted-foreground">
+                Reset the filters or create a new invoice to continue billing activity.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSearchQuery("")
+                  setFilters({ status: "", category: "" })
+                }}
+              >
+                Clear filters
+              </Button>
+              <Link href="/admin/invoices/new">
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Invoice
+                </Button>
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {filteredInvoices.map((invoice) => {
+              const pendingAmount = Math.max(0, Number(invoice.total || 0) - Number(invoice.amountPaid || 0))
+
+              return (
+                <button
+                  key={invoice.id}
+                  type="button"
+                  onClick={() => router.push(`/admin/invoices/${invoice.id}`)}
+                  className="w-full text-left transition-colors hover:bg-slate-50/80"
+                >
+                  <div className="flex flex-col gap-5 p-6 xl:flex-row xl:items-center xl:justify-between">
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-lg font-semibold text-slate-900">{invoice.invoiceNumber}</h3>
+                          <StatusBadge status={invoice.status} customColorMap={statusColorMap} />
+                        </div>
+                        <p className="text-sm text-slate-600">
+                          {invoice.clientName}
+                          {invoice.projectName ? ` · ${invoice.projectName}` : ""}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline" className="rounded-full border-slate-200 px-3 py-1 text-slate-600">
+                          {invoice.billingCategory || "General"}
+                        </Badge>
+                        <Badge variant="outline" className="rounded-full border-slate-200 px-3 py-1 text-slate-600">
+                          Issued {format(new Date(invoice.issueDate), "dd MMM yyyy")}
+                        </Badge>
+                        <Badge variant="outline" className="rounded-full border-slate-200 px-3 py-1 text-slate-600">
+                          Due {format(new Date(invoice.dueDate), "dd MMM yyyy")}
+                        </Badge>
+                      </div>
+
+                      <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-600">
+                        <span>
+                          Collected{" "}
+                          <span className="font-medium text-emerald-700">
+                            {formatCurrency(invoice.amountPaid || 0, invoice.currency || "INR")}
+                          </span>
+                        </span>
+                        <span>
+                          Pending{" "}
+                          <span className="font-medium text-amber-700">
+                            {formatCurrency(pendingAmount, invoice.currency || "INR")}
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3 xl:min-w-[250px] xl:items-end">
+                      <div className="space-y-1 text-left xl:text-right">
+                        <p className="text-sm text-slate-500">Invoice total</p>
+                        <p className="text-lg font-semibold text-slate-900">
+                          {formatCurrency(invoice.total || 0, invoice.currency || "INR")}
+                        </p>
+                      </div>
+                      <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-900">
+                        Open invoice workspace
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
       </Card>
     </div>
   )

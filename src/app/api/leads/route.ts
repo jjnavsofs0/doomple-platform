@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { notifyAdmins, notifyUserById } from "@/lib/realtime";
 import { leadSchema } from "@/lib/validations";
 
 export async function GET(request: Request) {
@@ -160,6 +161,32 @@ export async function POST(request: Request) {
         userId: session.user.id,
       },
     });
+
+    await notifyAdmins({
+      title: "New lead created",
+      message: `${lead.fullName} entered the CRM${lead.companyName ? ` from ${lead.companyName}` : ""}.`,
+      type: "LEAD",
+      link: `/admin/leads/${lead.id}`,
+      topics: ["dashboard", "leads", "notifications"],
+      metadata: {
+        leadId: lead.id,
+        status: lead.status,
+      },
+    });
+
+    if (lead.assignedToId) {
+      await notifyUserById({
+        userId: lead.assignedToId,
+        title: "Lead assigned to you",
+        message: `${lead.fullName} is now assigned to your queue.`,
+        type: "LEAD",
+        link: `/admin/leads/${lead.id}`,
+        topics: ["leads", "notifications"],
+        metadata: {
+          leadId: lead.id,
+        },
+      });
+    }
 
     return NextResponse.json(
       {

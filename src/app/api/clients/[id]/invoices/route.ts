@@ -23,6 +23,7 @@ export async function GET(
       data: invoices.map((invoice) => ({
         ...invoice,
         amount: Number(invoice.total || 0),
+        currency: invoice.currency || "INR",
         status: String(invoice.status || "").toLowerCase(),
       })),
     });

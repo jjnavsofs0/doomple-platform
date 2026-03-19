@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { notifyAdmins } from "@/lib/realtime";
 
 export async function GET(
   request: Request,
@@ -57,6 +58,17 @@ export async function GET(
           },
           orderBy: { createdAt: "desc" },
         },
+        convertedFromLeads: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            companyName: true,
+            status: true,
+            convertedProjectId: true,
+          },
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
 
@@ -74,10 +86,6 @@ export async function GET(
         contactPersonName: client.contactName,
         address: client.billingAddress,
         status: client.isActive ? "active" : "inactive",
-        bankName: null,
-        bankAccountNumber: null,
-        ifscCode: null,
-        panNumber: null,
       },
     });
   } catch (error) {
@@ -154,9 +162,30 @@ export async function PUT(
           body.country !== undefined ? body.country : existingClient.country,
         gstNumber:
           body.gstNumber !== undefined ? body.gstNumber : existingClient.gstNumber,
+        panNumber:
+          body.panNumber !== undefined ? body.panNumber : existingClient.panNumber,
+        bankName:
+          body.bankName !== undefined ? body.bankName : existingClient.bankName,
+        bankAccountNumber:
+          body.bankAccountNumber !== undefined
+            ? body.bankAccountNumber
+            : existingClient.bankAccountNumber,
+        ifscCode:
+          body.ifscCode !== undefined ? body.ifscCode : existingClient.ifscCode,
         notes: body.notes !== undefined ? body.notes : existingClient.notes,
         isActive:
           body.isActive !== undefined ? body.isActive : existingClient.isActive,
+      },
+    });
+
+    await notifyAdmins({
+      title: "Client updated",
+      message: `${updatedClient.companyName} account details were updated.`,
+      link: `/admin/clients/${updatedClient.id}`,
+      topics: ["dashboard", "clients", "notifications"],
+      metadata: {
+        clientId: updatedClient.id,
+        isActive: updatedClient.isActive,
       },
     });
 
@@ -221,6 +250,15 @@ export async function DELETE(
     await prisma.client.update({
       where: { id: params.id },
       data: { isActive: false },
+    });
+
+    await notifyAdmins({
+      title: "Client archived",
+      message: `${client.companyName} was marked inactive.`,
+      topics: ["dashboard", "clients", "notifications"],
+      metadata: {
+        clientId: client.id,
+      },
     });
 
     return NextResponse.json({

@@ -1,4 +1,4 @@
-import { SendEmailCommand, SESClient } from "@aws-sdk/client-ses";
+import { SendEmailCommand, SendRawEmailCommand, SESClient } from "@aws-sdk/client-ses";
 
 function getSesClient() {
   const region = process.env.AWS_SES_REGION || process.env.AWS_REGION;
@@ -52,7 +52,9 @@ export async function sendTransactionalEmail(params: {
   const fromEmail = process.env.AWS_SES_FROM_EMAIL;
 
   if (!sesClient || !fromEmail) {
-    throw new Error("AWS SES is not configured");
+    throw new Error(
+      "AWS SES is not configured. Please set AWS_SES_REGION, AWS_SES_FROM_EMAIL, and SES credentials in environment variables."
+    );
   }
 
   await sesClient.send(
@@ -77,6 +79,89 @@ export async function sendTransactionalEmail(params: {
             Data: params.text,
           },
         },
+      },
+    })
+  );
+}
+
+/**
+ * Send an email with an optional PDF attachment via SES SendRawEmailCommand.
+ * This is required because SendEmailCommand does not support attachments.
+ */
+export async function sendEmailWithAttachment(params: {
+  to: string[];
+  subject: string;
+  html: string;
+  text: string;
+  replyTo?: string;
+  attachment?: {
+    filename: string;
+    content: Buffer;
+    contentType: string;
+  };
+}) {
+  const sesClient = getSesClient();
+  const fromEmail = process.env.AWS_SES_FROM_EMAIL;
+
+  if (!sesClient || !fromEmail) {
+    throw new Error(
+      "AWS SES is not configured. Please set AWS_SES_REGION, AWS_SES_FROM_EMAIL, and SES credentials in environment variables."
+    );
+  }
+
+  const boundary = `boundary_${Date.now()}`;
+  const altBoundary = `alt_${boundary}`;
+
+  // Build MIME multipart email
+  const lines: string[] = [
+    `From: ${fromEmail}`,
+    `To: ${params.to.join(", ")}`,
+    `Subject: ${params.subject}`,
+    ...(params.replyTo ? [`Reply-To: ${params.replyTo}`] : []),
+    `MIME-Version: 1.0`,
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
+    ``,
+    `--${boundary}`,
+    `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
+    ``,
+    `--${altBoundary}`,
+    `Content-Type: text/plain; charset=UTF-8`,
+    `Content-Transfer-Encoding: quoted-printable`,
+    ``,
+    params.text,
+    ``,
+    `--${altBoundary}`,
+    `Content-Type: text/html; charset=UTF-8`,
+    `Content-Transfer-Encoding: quoted-printable`,
+    ``,
+    params.html,
+    ``,
+    `--${altBoundary}--`,
+  ];
+
+  if (params.attachment) {
+    const base64Content = params.attachment.content.toString("base64");
+    // Split base64 into 76-char lines per MIME spec
+    const chunked = base64Content.match(/.{1,76}/g)?.join("\r\n") ?? base64Content;
+    lines.push(
+      ``,
+      `--${boundary}`,
+      `Content-Type: ${params.attachment.contentType}; name="${params.attachment.filename}"`,
+      `Content-Disposition: attachment; filename="${params.attachment.filename}"`,
+      `Content-Transfer-Encoding: base64`,
+      ``,
+      chunked
+    );
+  }
+
+  lines.push(``, `--${boundary}--`);
+
+  const rawMessage = lines.join("\r\n");
+
+  await sesClient.send(
+    new SendRawEmailCommand({
+      RawMessage: {
+        Data: Buffer.from(rawMessage),
       },
     })
   );

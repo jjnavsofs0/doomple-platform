@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/ui/page-header';
+import { useToast } from '@/components/ui/toast';
 import {
   AlertCircle,
   Building2,
@@ -28,10 +29,28 @@ interface ProfileData {
   gst: string;
 }
 
+interface ErasureWorkflowData {
+  latestRequest: {
+    id: string;
+    status: 'REQUESTED' | 'RESTRICTED' | 'ANONYMIZED' | 'RETAINED_FOR_FINANCE';
+    requestedReason: string;
+    retentionReason: string | null;
+    internalNotes: string | null;
+    requestedAt: string;
+    restrictedAt: string | null;
+    resolvedAt: string | null;
+  } | null;
+  impact: {
+    requiresRetention: boolean;
+    recommendedStatus: 'ANONYMIZED' | 'RETAINED_FOR_FINANCE';
+  };
+}
+
 const inputClassName =
   'w-full rounded-2xl border border-[#D7E3F0] bg-[#F8FBFF] px-4 py-3 text-[#042042] outline-none transition-all focus:border-[#1ABFAD] focus:bg-white focus:ring-2 focus:ring-[#1ABFAD]/20';
 
 export default function ProfilePage() {
+  const { toast } = useToast();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +59,9 @@ export default function ProfilePage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const [erasureWorkflow, setErasureWorkflow] = useState<ErasureWorkflowData | null>(null);
+  const [erasureReason, setErasureReason] = useState('');
+  const [submittingErasure, setSubmittingErasure] = useState(false);
 
   const [formData, setFormData] = useState<Partial<ProfileData>>({});
   const [passwordData, setPasswordData] = useState({
@@ -56,6 +78,13 @@ export default function ProfilePage() {
         const result = await response.json();
         setProfile(result);
         setFormData(result);
+
+        const erasureResponse = await fetch('/api/account/erasure-request');
+        if (erasureResponse.ok) {
+          const erasureResult = await erasureResponse.json();
+          setErasureWorkflow(erasureResult.data);
+          setErasureReason(erasureResult.data?.latestRequest?.requestedReason || '');
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
@@ -82,10 +111,17 @@ export default function ProfilePage() {
       setProfile(updated);
       setFormData(updated);
       setEditMode(false);
-      setSuccess('Profile updated successfully');
-      setTimeout(() => setSuccess(null), 3000);
+      toast({
+        type: 'success',
+        title: 'Profile updated',
+        description: 'Your profile details were saved successfully.',
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update profile');
+      toast({
+        type: 'error',
+        title: 'Could not update profile',
+        description: err instanceof Error ? err.message : 'Failed to update profile',
+      });
     }
   };
 
@@ -95,7 +131,11 @@ export default function ProfilePage() {
     setSuccess(null);
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setError('Passwords do not match');
+      toast({
+        type: 'error',
+        title: 'Passwords do not match',
+        description: 'Please make sure both password fields match.',
+      });
       return;
     }
 
@@ -112,10 +152,58 @@ export default function ProfilePage() {
       if (!response.ok) throw new Error('Failed to change password');
       setPasswordMode(false);
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      setSuccess('Password changed successfully');
-      setTimeout(() => setSuccess(null), 3000);
+      toast({
+        type: 'success',
+        title: 'Password updated',
+        description: 'Your password was changed successfully.',
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to change password');
+      toast({
+        type: 'error',
+        title: 'Could not change password',
+        description: err instanceof Error ? err.message : 'Failed to change password',
+      });
+    }
+  };
+
+  const handleRequestClosure = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+    setSubmittingErasure(true);
+
+    try {
+      const response = await fetch('/api/account/erasure-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestedReason: erasureReason }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to submit account closure request');
+      }
+
+      toast({
+        type: 'success',
+        title: 'Account closure requested',
+        description: result.message || 'Your account closure request was submitted successfully.',
+      });
+
+      const refresh = await fetch('/api/account/erasure-request');
+      if (refresh.ok) {
+        const refreshed = await refresh.json();
+        setErasureWorkflow(refreshed.data);
+      }
+    } catch (err) {
+      toast({
+        type: 'error',
+        title: 'Could not submit closure request',
+        description:
+          err instanceof Error ? err.message : 'Failed to submit account closure request',
+      });
+    } finally {
+      setSubmittingErasure(false);
     }
   };
 
@@ -413,6 +501,58 @@ export default function ProfilePage() {
                 ))}
               </div>
             ) : null}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[32px] border-[#DDE8F2] bg-white/90 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-xl text-[#042042]">Close Account Request</CardTitle>
+            <p className="mt-1 text-sm text-[#64748B]">
+              Request account closure or erasure review. If invoices, payments, or other records must be retained, access will be restricted and only the minimum required data will be kept.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div
+              className={`rounded-3xl border px-5 py-4 ${
+                erasureWorkflow?.impact?.requiresRetention
+                  ? 'border-amber-200 bg-amber-50'
+                  : 'border-emerald-200 bg-emerald-50'
+              }`}
+            >
+              <p className="text-sm font-semibold text-[#042042]">
+                {erasureWorkflow?.latestRequest
+                  ? `Current status: ${erasureWorkflow.latestRequest.status.replaceAll('_', ' ')}`
+                  : 'No closure request submitted yet'}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[#64748B]">
+                {erasureWorkflow?.impact?.requiresRetention
+                  ? 'Your account appears linked to billing or delivery records, so Doomple may need to retain a minimal record set while deactivating access.'
+                  : 'No finance or delivery blockers were detected, so full anonymization may be possible after review.'}
+              </p>
+            </div>
+
+            <form onSubmit={handleRequestClosure} className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-[#374151]">
+                  Why are you requesting account closure?
+                </label>
+                <textarea
+                  value={erasureReason}
+                  onChange={(e) => setErasureReason(e.target.value)}
+                  className={`${inputClassName} min-h-[140px] resize-y`}
+                  rows={5}
+                  placeholder="Tell us whether you want account closure, data erasure, marketing suppression, or another privacy-related action."
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="rounded-2xl bg-[#042042] px-5 text-white hover:bg-[#07315F]"
+                disabled={submittingErasure}
+              >
+                {submittingErasure ? 'Submitting...' : 'Submit Closure Request'}
+              </Button>
+            </form>
           </CardContent>
         </Card>
 

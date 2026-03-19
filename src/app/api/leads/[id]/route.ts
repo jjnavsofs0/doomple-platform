@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { notifyAdmins, notifyUserById } from "@/lib/realtime";
 
 export async function GET(
   request: Request,
@@ -45,6 +46,20 @@ export async function GET(
             id: true,
             name: true,
             email: true,
+          },
+        },
+        convertedClient: {
+          select: {
+            id: true,
+            companyName: true,
+            email: true,
+          },
+        },
+        convertedProject: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
           },
         },
       },
@@ -156,6 +171,36 @@ export async function PUT(
       });
     }
 
+    await notifyAdmins({
+      title: "Lead updated",
+      message: `${updatedLead.fullName} was updated in the CRM.`,
+      type: "LEAD",
+      link: `/admin/leads/${updatedLead.id}`,
+      topics: ["dashboard", "leads", "notifications"],
+      metadata: {
+        leadId: updatedLead.id,
+        status: updatedLead.status,
+      },
+    });
+
+    if (
+      body.assignedToId &&
+      body.assignedToId !== existingLead.assignedToId &&
+      body.assignedToId !== session.user.id
+    ) {
+      await notifyUserById({
+        userId: body.assignedToId,
+        title: "Lead assigned to you",
+        message: `${updatedLead.fullName} was assigned to you.`,
+        type: "LEAD",
+        link: `/admin/leads/${updatedLead.id}`,
+        topics: ["leads", "notifications"],
+        metadata: {
+          leadId: updatedLead.id,
+        },
+      });
+    }
+
     return NextResponse.json({
       success: true,
       message: "Lead updated successfully",
@@ -200,6 +245,16 @@ export async function DELETE(
     // Delete the lead
     await prisma.lead.delete({
       where: { id: params.id },
+    });
+
+    await notifyAdmins({
+      title: "Lead removed",
+      message: `${lead.fullName} was deleted from the CRM.`,
+      type: "LEAD",
+      topics: ["dashboard", "leads", "notifications"],
+      metadata: {
+        leadId: lead.id,
+      },
     });
 
     return NextResponse.json({

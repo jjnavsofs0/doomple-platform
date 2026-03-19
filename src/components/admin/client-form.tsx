@@ -4,6 +4,7 @@ import * as React from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useToast } from "@/components/ui/toast"
 
 interface ClientFormData {
   companyName: string
@@ -39,6 +40,7 @@ const ClientForm = React.forwardRef<HTMLFormElement, ClientFormProps>(
     },
     ref
   ) => {
+    const { toast } = useToast()
     const [formData, setFormData] = React.useState<ClientFormData>(
       initialData || {
         companyName: "",
@@ -77,10 +79,20 @@ const ClientForm = React.forwardRef<HTMLFormElement, ClientFormProps>(
 
       try {
         await onSubmit(formData)
+        toast({
+          type: "success",
+          title: "Client saved",
+          description: "The client details were saved successfully.",
+        })
       } catch (err) {
-        setError(
+        const message =
           err instanceof Error ? err.message : "An error occurred while saving"
-        )
+        setError(message)
+        toast({
+          type: "error",
+          title: "Could not save client",
+          description: message,
+        })
       } finally {
         setIsSubmitting(false)
       }

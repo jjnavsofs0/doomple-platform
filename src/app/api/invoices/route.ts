@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { recordAuditLog } from "@/lib/audit-log";
+import { normalizeCurrency } from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
+import { notifyAdmins } from "@/lib/realtime";
 import { invoiceSchema } from "@/lib/validations";
 import { getAppSettingValue } from "@/lib/app-settings";
 
@@ -90,6 +93,7 @@ export async function GET(request: Request) {
       total: Number(invoice.total || 0),
       amountPaid: Number(invoice.paidAmount || 0),
       billingCategory: invoice.billingCategory || "General",
+      currency: invoice.currency || "INR",
       status: invoice.status
         .toLowerCase()
         .split("_")
@@ -139,6 +143,67 @@ export async function POST(request: Request) {
       });
     }
 
+    if (body.quotationId && quotationSource) {
+      if (quotationSource.status !== "ACCEPTED") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Only accepted quotations can be converted into invoices.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const existingInvoices = await prisma.invoice.findMany({
+        where: { quotationId: body.quotationId },
+        select: {
+          id: true,
+          invoiceNumber: true,
+          status: true,
+          currency: true,
+          total: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "asc" },
+      });
+
+      if (existingInvoices.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              existingInvoices.length === 1
+                ? "An invoice has already been created from this quotation."
+                : "Multiple invoices are already linked to this quotation.",
+            data: {
+              existingInvoice:
+                existingInvoices.length === 1
+                  ? {
+                      ...existingInvoices[0],
+                      total: Number(existingInvoices[0].total || 0),
+                      status: existingInvoices[0].status
+                        .toLowerCase()
+                        .split("_")
+                        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+                        .join(" "),
+                    }
+                  : null,
+              existingInvoices: existingInvoices.map((invoice) => ({
+                ...invoice,
+                total: Number(invoice.total || 0),
+                status: invoice.status
+                  .toLowerCase()
+                  .split("_")
+                  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+                  .join(" "),
+              })),
+            },
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     const items = Array.isArray(body.items)
       ? body.items
       : Array.isArray(body.lineItems)
@@ -168,6 +233,7 @@ export async function POST(request: Request) {
           .toISOString()
           .slice(0, 10),
       billingCategory: body.billingCategory || "Development",
+      currency: normalizeCurrency(body.currency || quotationSource?.currency || "INR"),
       notes: body.notes || "",
       items,
     };
@@ -223,6 +289,7 @@ export async function POST(request: Request) {
     const invoice = await prisma.invoice.create({
       data: {
         invoiceNumber,
+        currency: normalizedData.currency,
         issueDate: new Date(normalizedData.issueDate),
         dueDate: new Date(normalizedData.dueDate),
         subtotal,
@@ -270,6 +337,33 @@ export async function POST(request: Request) {
             name: true,
           },
         },
+      },
+    });
+
+    await recordAuditLog({
+      entityType: "invoice",
+      entityId: invoice.id,
+      action: "created",
+      summary: `Invoice ${invoice.invoiceNumber} was created`,
+      userId: session.user.id,
+      metadata: {
+        invoiceNumber: invoice.invoiceNumber,
+        currency: invoice.currency || "INR",
+        total: Number(invoice.total || 0),
+        status: invoice.status,
+        quotationId: invoice.quotationId || null,
+      },
+    });
+
+    await notifyAdmins({
+      title: "Invoice created",
+      message: `${invoice.invoiceNumber} was created${invoice.client?.companyName ? ` for ${invoice.client.companyName}` : ""}.`,
+      type: "INVOICE",
+      link: `/admin/invoices/${invoice.id}`,
+      topics: ["dashboard", "invoices", "notifications"],
+      metadata: {
+        invoiceId: invoice.id,
+        status: invoice.status,
       },
     });
 

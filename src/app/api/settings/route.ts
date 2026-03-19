@@ -3,8 +3,42 @@ import { getAppSettings, updateAppSettings } from "@/lib/app-settings";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { getStorageIntegrationStatus, isS3Configured } from "@/lib/storage";
 import { getSesIntegrationStatus, isSesConfigured } from "@/lib/email";
+import { SUPPORTED_CURRENCIES, normalizeCurrency } from "@/lib/billing";
+import { getPusherIntegrationStatus } from "@/lib/pusher-server";
 
 export const dynamic = "force-dynamic";
+
+function sanitizeSettingUpdate(key: string, value: unknown) {
+  if (key !== "payment_gateway_settings" || !value || typeof value !== "object") {
+    return value;
+  }
+
+  const settings = value as {
+    gateways?: Array<{
+      key?: string;
+      label?: string;
+      enabled?: boolean;
+      supportedCurrencies?: string[];
+    }>;
+  };
+
+  return {
+    gateways: Array.isArray(settings.gateways)
+      ? settings.gateways.map((gateway) => ({
+          key: String(gateway.key || ""),
+          label: String(gateway.label || gateway.key || ""),
+          enabled: Boolean(gateway.enabled),
+          supportedCurrencies: Array.from(
+            new Set(
+              (Array.isArray(gateway.supportedCurrencies) ? gateway.supportedCurrencies : [])
+                .map((currency) => normalizeCurrency(currency))
+                .filter((currency) => SUPPORTED_CURRENCIES.includes(currency as (typeof SUPPORTED_CURRENCIES)[number]))
+            )
+          ),
+        }))
+      : [],
+  };
+}
 
 export async function GET() {
   try {
@@ -16,6 +50,7 @@ export async function GET() {
     const settings = await getAppSettings();
     const storage = getStorageIntegrationStatus();
     const ses = getSesIntegrationStatus();
+    const pusher = getPusherIntegrationStatus();
 
     return NextResponse.json({
       success: true,
@@ -31,6 +66,11 @@ export async function GET() {
         sesRegion: ses.region,
         sesFromEmail: ses.fromEmail,
         sesReplyToEmail: ses.replyToEmail,
+        realtimeConfigured: pusher.configured,
+        realtimeCluster: pusher.cluster,
+        realtimeAppIdConfigured: pusher.appIdConfigured,
+        realtimeKeyConfigured: pusher.keyConfigured,
+        realtimeSecretConfigured: pusher.secretConfigured,
       },
     });
   } catch (error) {
@@ -59,7 +99,13 @@ export async function PATCH(request: Request) {
       );
     }
 
-    await updateAppSettings(updates, auth.session.user.id);
+    await updateAppSettings(
+      updates.map((update: { key: string; value: unknown }) => ({
+        key: update.key,
+        value: sanitizeSettingUpdate(update.key, update.value),
+      })),
+      auth.session.user.id
+    );
     const settings = await getAppSettings();
 
     return NextResponse.json({

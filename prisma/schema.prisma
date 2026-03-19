@@ -139,38 +139,181 @@ enum NotificationType {
   SYSTEM
 }
 
+enum EmailVerificationStatus {
+  PENDING
+  VERIFIED
+}
+
+enum AccountErasureRequestStatus {
+  REQUESTED
+  RESTRICTED
+  ANONYMIZED
+  RETAINED_FOR_FINANCE
+}
+
+enum CookieConsentDecision {
+  ACCEPT_ALL
+  ESSENTIAL_ONLY
+}
+
+enum AppErrorSeverity {
+  INFO
+  WARNING
+  ERROR
+  CRITICAL
+}
+
+enum AppErrorSource {
+  CLIENT
+  SERVER
+  RENDER
+}
+
 // ========== MODELS ==========
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String
-  passwordHash  String
-  role          UserRole
-  phone         String?
-  avatar        String?
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                        String                  @id @default(cuid())
+  email                     String                  @unique
+  name                      String
+  passwordHash              String
+  role                      UserRole
+  phone                     String?
+  avatar                    String?
+  avatarStorageKey          String?
+  avatarStorageProvider     String?
+  emailVerificationStatus   EmailVerificationStatus @default(VERIFIED)
+  emailVerifiedAt           DateTime?
+  transactionalEmailsEnabled Boolean               @default(true)
+  marketingEmailsEnabled    Boolean                @default(true)
+  isActive                  Boolean                @default(true)
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
 
   // Relations
-  assignedLeads         Lead[]
-  leadNotes             LeadNote[]
-  leadActivities        LeadActivity[]
-  managedProjects       Project[]
-  projectNotes          ProjectNote[]
-  projectStatusChanges  ProjectStatusHistory[]
-  clientCommunications  ClientCommunication[]
-  createdQuotations     Quotation[]
-  createdInvoices       Invoice[]
-  fileAttachments       FileAttachment[]
-  notifications         Notification[]
-  updatedAppSettings    AppSetting[]
+  assignedLeads             Lead[]
+  leadNotes                 LeadNote[]
+  leadActivities            LeadActivity[]
+  managedProjects           Project[]
+  projectNotes              ProjectNote[]
+  projectStatusChanges      ProjectStatusHistory[]
+  clientCommunications      ClientCommunication[]
+  createdQuotations         Quotation[]
+  createdInvoices           Invoice[]
+  fileAttachments           FileAttachment[]
+  notifications             Notification[]
+  updatedAppSettings        AppSetting[]
+  deletedQuotations         Quotation[]            @relation("QuotationDeletedBy")
+  auditLogs                 AdminAuditLog[]        @relation("AdminAuditActor")
+  emailChangeRequests       EmailChangeRequest[]
+  erasureRequests           AccountErasureRequest[]
+  cookieConsents            CookieConsentRecord[]
+  appErrorLogs              AppErrorLog[]          @relation("AppErrorActor")
+  resolvedAppErrorLogs      AppErrorLog[]          @relation("AppErrorResolvedBy")
 
   @@index([email])
   @@index([role])
   @@index([isActive])
+  @@index([emailVerificationStatus])
   @@index([createdAt])
+}
+
+model EmailChangeRequest {
+  id         String    @id @default(cuid())
+  newEmail   String
+  token      String    @unique
+  expiresAt  DateTime
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // Foreign Keys
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([newEmail])
+  @@index([expiresAt])
+  @@index([verifiedAt])
+}
+
+model AccountErasureRequest {
+  id               String                      @id @default(cuid())
+  status           AccountErasureRequestStatus @default(REQUESTED)
+  requestedReason  String                      @db.Text
+  retentionReason  String?                     @db.Text
+  internalNotes    String?                     @db.Text
+  requestedAt      DateTime                    @default(now())
+  restrictedAt     DateTime?
+  resolvedAt       DateTime?
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  requestedById    String?
+  reviewedById     String?
+
+  userId           String
+  user             User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([requestedAt])
+  @@index([resolvedAt])
+}
+
+model CookieConsentRecord {
+  id            String                @id @default(cuid())
+  policyVersion String
+  decision      CookieConsentDecision
+  source        String                @default("banner")
+  preferences   Json?
+  ipAddress     String?
+  userAgent     String?
+  acceptedAt    DateTime              @default(now())
+  createdAt     DateTime              @default(now())
+
+  visitorId     String
+  userId        String?
+  user          User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([visitorId])
+  @@index([userId])
+  @@index([policyVersion])
+  @@index([acceptedAt])
+}
+
+model AppErrorLog {
+  id            String           @id @default(cuid())
+  fingerprint   String           @unique
+  title         String
+  message       String           @db.Text
+  severity      AppErrorSeverity @default(ERROR)
+  source        AppErrorSource   @default(SERVER)
+  route         String?
+  area          String?
+  method        String?
+  statusCode    Int?
+  stack         String?          @db.Text
+  metadata      Json?
+  occurrences   Int              @default(1)
+  firstSeenAt   DateTime         @default(now())
+  lastSeenAt    DateTime         @default(now())
+  lastAlertedAt DateTime?
+  isResolved    Boolean          @default(false)
+  resolvedAt    DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  userId        String?
+  user          User?            @relation("AppErrorActor", fields: [userId], references: [id], onDelete: SetNull)
+  resolvedById  String?
+  resolvedBy    User?            @relation("AppErrorResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([severity])
+  @@index([source])
+  @@index([isResolved])
+  @@index([lastSeenAt])
+  @@index([route])
+  @@index([userId])
+  @@index([resolvedById])
 }
 
 model Lead {
@@ -269,6 +412,10 @@ model Client {
   country       String?
   postalCode    String?
   gstNumber     String?
+  panNumber     String?
+  bankName      String?
+  bankAccountNumber String?
+  ifscCode      String?
   notes         String?   @db.Text
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
@@ -323,6 +470,7 @@ model ClientCommunication {
 model Project {
   id                  String        @id @default(cuid())
   name                String
+  currency            String        @default("INR")
   category            ProjectCategory
   description         String?       @db.Text
   scope               String?       @db.Text
@@ -462,6 +610,7 @@ model ToolkitProjectDetail {
 model Quotation {
   id              String            @id @default(cuid())
   quotationNumber String            @unique
+  currency        String            @default("INR")
   title           String
   description     String?           @db.Text
   validUntil      DateTime?
@@ -472,6 +621,8 @@ model Quotation {
   discountAmount  Decimal           @default(0) @db.Decimal(12, 2)
   total           Decimal           @default(0) @db.Decimal(12, 2)
   template        String?
+  deletedAt       DateTime?
+  deleteReason    String?           @db.Text
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -482,6 +633,8 @@ model Quotation {
   client          Client?           @relation(fields: [clientId], references: [id], onDelete: SetNull)
   createdById     String
   createdBy       User              @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  deletedById     String?
+  deletedBy       User?             @relation("QuotationDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
 
   // Relations
   items           QuotationItem[]
@@ -491,6 +644,8 @@ model Quotation {
   @@index([leadId])
   @@index([clientId])
   @@index([createdById])
+  @@index([deletedAt])
+  @@index([deletedById])
   @@index([status])
   @@index([createdAt])
 }
@@ -515,6 +670,7 @@ model QuotationItem {
 model Invoice {
   id                String        @id @default(cuid())
   invoiceNumber     String        @unique
+  currency          String        @default("INR")
   issueDate         DateTime      @default(now())
   dueDate           DateTime
   subtotal          Decimal       @db.Decimal(12, 2)
@@ -604,6 +760,25 @@ model RazorpayWebhookLog {
   @@index([orderId])
   @@index([paymentId])
   @@index([verified])
+}
+
+model AdminAuditLog {
+  id         String    @id @default(cuid())
+  entityType String
+  entityId   String
+  action     String
+  summary    String
+  metadata   Json?
+  createdAt  DateTime  @default(now())
+
+  userId     String?
+  user       User?     @relation("AdminAuditActor", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entityType])
+  @@index([entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@index([userId])
 }
 
 model Service {

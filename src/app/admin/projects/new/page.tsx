@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/ui/page-header"
@@ -18,8 +18,11 @@ interface ManagerOption {
   name: string
 }
 
-export default function NewProjectPage() {
+function NewProjectContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const preselectedClientId = searchParams.get("clientId") || ""
+
   const [clients, setClients] = React.useState<ClientOption[]>([])
   const [managers, setManagers] = React.useState<ManagerOption[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
@@ -125,8 +128,25 @@ export default function NewProjectPage() {
           managers={managers}
           onSubmit={handleSubmit}
           submitLabel="Create Project"
+          initialData={preselectedClientId ? { clientId: preselectedClientId } : undefined}
         />
       )}
     </div>
+  )
+}
+
+export default function NewProjectPage() {
+  return (
+    <React.Suspense fallback={
+      <div className="space-y-6 p-6 max-w-4xl mx-auto">
+        <Skeleton className="h-10 w-32" />
+        <Skeleton className="h-20 w-full" />
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-40 w-full" />
+        ))}
+      </div>
+    }>
+      <NewProjectContent />
+    </React.Suspense>
   )
 }

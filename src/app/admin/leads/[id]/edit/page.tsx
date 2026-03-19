@@ -83,6 +83,7 @@ export default function EditLeadPage() {
         leadId={leadId}
         initialData={{
           ...lead,
+          assignedToId: lead.assignedToId ?? "",
           companyName: lead.companyName ?? undefined,
           phone: lead.phone ?? undefined,
           location: lead.location ?? undefined,

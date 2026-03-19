@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/ui/toast";
 import type { LeadFormData } from "@/types";
 
 const leadFormSchema = z.object({
@@ -30,6 +31,7 @@ const leadFormSchema = z.object({
   timeline: z.string().optional(),
   requirementsSummary: z.string().optional(),
   priority: z.string(),
+  assignedToId: z.string().optional(),
 });
 
 type LeadFormValues = z.infer<typeof leadFormSchema>;
@@ -84,8 +86,10 @@ const BUDGET_RANGES = [
 
 export function LeadForm({ leadId, initialData, onSuccess }: LeadFormProps) {
   const router = useRouter();
+  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [users, setUsers] = useState<Array<{ id: string; name: string; role: string; isActive: boolean }>>([]);
 
   const {
     register,
@@ -96,11 +100,31 @@ export function LeadForm({ leadId, initialData, onSuccess }: LeadFormProps) {
     resolver: zodResolver(leadFormSchema),
     defaultValues: {
       priority: "MEDIUM",
+      assignedToId: "",
       ...initialData,
     },
   });
 
   const selectedCategory = watch("category");
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch("/api/users?limit=100", { cache: "no-store" });
+        if (!response.ok) return;
+        const result = await response.json();
+        const nextUsers = (result.data || []).filter(
+          (user: { role: string; isActive: boolean }) =>
+            user.isActive && user.role !== "CLIENT"
+        );
+        setUsers(nextUsers);
+      } catch {
+        setUsers([]);
+      }
+    };
+
+    fetchUsers();
+  }, []);
 
   const onSubmit = async (data: LeadFormValues) => {
     try {
@@ -127,8 +151,21 @@ export function LeadForm({ leadId, initialData, onSuccess }: LeadFormProps) {
       } else {
         router.push(`/admin/leads/${result.data.id}`);
       }
+      toast({
+        type: "success",
+        title: leadId ? "Lead updated" : "Lead created",
+        description: leadId
+          ? "The lead details were updated."
+          : "The lead was created successfully.",
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save lead");
+      const message = err instanceof Error ? err.message : "Failed to save lead";
+      setError(message);
+      toast({
+        type: "error",
+        title: leadId ? "Could not update lead" : "Could not create lead",
+        description: message,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -239,6 +276,19 @@ export function LeadForm({ leadId, initialData, onSuccess }: LeadFormProps) {
               {PRIORITIES.map((priority) => (
                 <option key={priority.value} value={priority.value}>
                   {priority.label}
+                </option>
+              ))}
+            </Select>
+
+            <Select
+              label="Assign To"
+              {...register("assignedToId")}
+              defaultValue=""
+            >
+              <option value="">Unassigned</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name} ({user.role.replace(/_/g, " ")})
                 </option>
               ))}
             </Select>

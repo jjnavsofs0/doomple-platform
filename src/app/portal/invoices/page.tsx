@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/ui/page-header';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AlertCircle, DollarSign } from 'lucide-react';
+import { useUserLiveRefetch } from '@/hooks/use-live-refetch';
 
 interface Invoice {
   id: string;
@@ -48,22 +49,25 @@ export default function InvoicesPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('all');
 
-  useEffect(() => {
-    const fetchInvoices = async () => {
-      try {
-        const response = await fetch('/api/portal/invoices');
-        if (!response.ok) throw new Error('Failed to fetch invoices');
-        const result = await response.json();
-        setInvoices(result.invoices || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchInvoices();
+  const fetchInvoices = useCallback(async () => {
+    try {
+      const response = await fetch('/api/portal/invoices', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Failed to fetch invoices');
+      const result = await response.json();
+      setInvoices(result.invoices || []);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchInvoices();
+  }, [fetchInvoices]);
+
+  useUserLiveRefetch(["invoices", "payments", "dashboard"], fetchInvoices);
 
   const getFilteredInvoices = () => {
     if (activeTab === 'all') return invoices;

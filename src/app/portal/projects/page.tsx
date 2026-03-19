@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import {
   Layers3,
   TimerReset,
 } from 'lucide-react';
+import { useUserLiveRefetch } from '@/hooks/use-live-refetch';
 
 interface Project {
   id: string;
@@ -61,22 +62,25 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        const response = await fetch('/api/portal/projects');
-        if (!response.ok) throw new Error('Failed to fetch projects');
-        const result = await response.json();
-        setProjects(result.projects || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProjects();
+  const fetchProjects = useCallback(async () => {
+    try {
+      const response = await fetch('/api/portal/projects', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Failed to fetch projects');
+      const result = await response.json();
+      setProjects(result.projects || []);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
+
+  useUserLiveRefetch(["projects", "dashboard"], fetchProjects);
 
   const activeProjects = projects.filter((project) => project.status === 'active').length;
   const completedProjects = projects.filter((project) => project.status === 'completed').length;

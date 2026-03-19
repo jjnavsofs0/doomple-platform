@@ -181,68 +181,83 @@ export async function ensureInvoicePdfAttachment(invoiceId: string) {
     return null;
   }
 
-  const existingAttachment = await prisma.fileAttachment.findFirst({
-    where: {
-      entityType: "invoice_pdf",
-      entityId: invoiceId,
-    },
-  });
-
-  const uploaded = await uploadFile({
-    buffer: generated.bytes,
-    fileName: generated.fileName,
-    contentType: "application/pdf",
-    folder: `invoices/${invoiceId}`,
-    visibility: "private",
-  });
-
-  const attachment = existingAttachment
-    ? await prisma.fileAttachment.update({
-        where: { id: existingAttachment.id },
-        data: {
-          name: generated.fileName,
-          url: existingAttachment.url,
-          storageKey: uploaded.storageKey,
-          storageProvider: uploaded.provider,
-          mimeType: "application/pdf",
-          size: generated.bytes.length,
-        },
-      })
-    : await prisma.fileAttachment.create({
-        data: {
-          entityType: "invoice_pdf",
-          entityId: invoiceId,
-          name: generated.fileName,
-          url: "",
-          storageKey: uploaded.storageKey,
-          storageProvider: uploaded.provider,
-          mimeType: "application/pdf",
-          size: generated.bytes.length,
-        },
-      });
-
-  const downloadUrl = `/api/files/${attachment.id}/download`;
-
-  if (attachment.url !== downloadUrl) {
-    await prisma.fileAttachment.update({
-      where: { id: attachment.id },
-      data: { url: downloadUrl },
+  try {
+    const existingAttachment = await prisma.fileAttachment.findFirst({
+      where: {
+        entityType: "invoice_pdf",
+        entityId: invoiceId,
+      },
     });
-  }
 
-  return {
-    attachment: {
-      ...attachment,
-      url: downloadUrl,
-    },
-    bytes: generated.bytes,
-    fileName: generated.fileName,
-    invoice: generated.invoice,
-    signedUrl: await getStoredFileUrl({
-      id: attachment.id,
-      provider: uploaded.provider,
-      storageKey: uploaded.storageKey,
-      fallbackUrl: downloadUrl,
-    }),
-  };
+    const uploaded = await uploadFile({
+      buffer: generated.bytes,
+      fileName: generated.fileName,
+      contentType: "application/pdf",
+      folder: `invoices/${invoiceId}`,
+      visibility: "private",
+    });
+
+    const attachment = existingAttachment
+      ? await prisma.fileAttachment.update({
+          where: { id: existingAttachment.id },
+          data: {
+            name: generated.fileName,
+            url: existingAttachment.url,
+            storageKey: uploaded.storageKey,
+            storageProvider: uploaded.provider,
+            mimeType: "application/pdf",
+            size: generated.bytes.length,
+          },
+        })
+      : await prisma.fileAttachment.create({
+          data: {
+            entityType: "invoice_pdf",
+            entityId: invoiceId,
+            name: generated.fileName,
+            url: "",
+            storageKey: uploaded.storageKey,
+            storageProvider: uploaded.provider,
+            mimeType: "application/pdf",
+            size: generated.bytes.length,
+          },
+        });
+
+    const downloadUrl = `/api/files/${attachment.id}/download`;
+
+    if (attachment.url !== downloadUrl) {
+      await prisma.fileAttachment.update({
+        where: { id: attachment.id },
+        data: { url: downloadUrl },
+      });
+    }
+
+    return {
+      attachment: {
+        ...attachment,
+        url: downloadUrl,
+      },
+      bytes: generated.bytes,
+      fileName: generated.fileName,
+      invoice: generated.invoice,
+      signedUrl: await getStoredFileUrl({
+        id: attachment.id,
+        provider: uploaded.provider,
+        storageKey: uploaded.storageKey,
+        fallbackUrl: downloadUrl,
+      }),
+    };
+  } catch (error) {
+    console.warn(
+      "Invoice PDF storage sync failed; serving generated PDF without attachment:",
+      error instanceof Error ? error.message : error
+    );
+
+    return {
+      attachment: null,
+      bytes: generated.bytes,
+      fileName: generated.fileName,
+      invoice: generated.invoice,
+      signedUrl: null,
+    };
+  }
 }

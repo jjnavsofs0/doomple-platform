@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { isGatewaySupportedForCurrency, normalizeCurrency } from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
 import { createPaymentLink, isRazorpayConfigured } from "@/lib/razorpay";
 import { getOutstandingAmount } from "@/lib/invoice-payments";
 import { canAccessInvoiceForPayment } from "@/lib/invoice-access";
+import { getErrorMessage, getErrorStack, recordAppError } from "@/lib/app-error-log";
+import { notifyAdmins, notifyClientUsersByEmail } from "@/lib/realtime";
 
 export async function POST(request: Request) {
   try {
@@ -51,6 +54,16 @@ export async function POST(request: Request) {
       );
     }
 
+    if (invoice.status === "DRAFT") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Move the invoice to Sent before generating a payment link.",
+        },
+        { status: 400 }
+      );
+    }
+
     if (!canAccessInvoiceForPayment(session.user, invoice.client.email)) {
       return NextResponse.json(
         { success: false, error: "Forbidden" },
@@ -59,9 +72,20 @@ export async function POST(request: Request) {
     }
 
     const outstandingAmount = getOutstandingAmount(invoice.total, invoice.paidAmount);
+    const invoiceCurrency = normalizeCurrency(invoice.currency);
     if (outstandingAmount <= 0) {
       return NextResponse.json(
         { success: false, error: "Invoice is already fully paid" },
+        { status: 400 }
+      );
+    }
+
+    if (!(await isGatewaySupportedForCurrency("RAZORPAY", invoiceCurrency))) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Razorpay is not enabled for ${invoiceCurrency} invoices. Update payment gateway settings or use a supported currency.`,
+        },
         { status: 400 }
       );
     }
@@ -74,6 +98,7 @@ export async function POST(request: Request) {
 
     const paymentLinkResult = await createPaymentLink({
       amount: Math.round(outstandingAmount * 100),
+      currency: invoiceCurrency,
       description: `Invoice #${invoice.invoiceNumber}`,
       customer_info: {
         name:
@@ -87,6 +112,21 @@ export async function POST(request: Request) {
     });
 
     if (!paymentLinkResult.success || !paymentLinkResult.data) {
+      await recordAppError({
+        title: "Razorpay payment link creation failed",
+        message: String(paymentLinkResult.error || "Failed to create payment link"),
+        severity: "CRITICAL",
+        source: "SERVER",
+        route: "/api/razorpay/create-payment-link",
+        area: "payments",
+        method: "POST",
+        statusCode: 500,
+        metadata: {
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          currency: invoiceCurrency,
+        },
+      });
       return NextResponse.json(
         { success: false, error: paymentLinkResult.error || "Failed to create payment link" },
         { status: 500 }
@@ -97,6 +137,30 @@ export async function POST(request: Request) {
       where: { id: invoice.id },
       data: {
         razorpayPaymentLink: paymentLinkResult.data.short_url,
+      },
+    });
+
+    await notifyAdmins({
+      title: "Payment link generated",
+      message: `A Razorpay payment link was generated for ${invoice.invoiceNumber}.`,
+      type: "PAYMENT",
+      link: `/admin/invoices/${invoice.id}`,
+      topics: ["invoices", "payments", "notifications"],
+      metadata: {
+        invoiceId: invoice.id,
+        paymentLinkId: paymentLinkResult.data.id,
+      },
+    });
+
+    await notifyClientUsersByEmail({
+      email: invoice.client.email,
+      title: "Payment link available",
+      message: `A payment link is ready for invoice ${invoice.invoiceNumber}.`,
+      type: "PAYMENT",
+      link: "/portal/invoices",
+      topics: ["invoices", "payments", "notifications"],
+      metadata: {
+        invoiceId: invoice.id,
       },
     });
 
@@ -113,6 +177,17 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Create Razorpay payment link error:", error);
+    await recordAppError({
+      title: "Create Razorpay payment link error",
+      message: getErrorMessage(error),
+      severity: "CRITICAL",
+      source: "SERVER",
+      route: "/api/razorpay/create-payment-link",
+      area: "payments",
+      method: "POST",
+      statusCode: 500,
+      stack: getErrorStack(error),
+    });
     return NextResponse.json(
       { success: false, error: "Failed to create payment link" },
       { status: 500 }

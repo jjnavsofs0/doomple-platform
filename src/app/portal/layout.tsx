@@ -15,6 +15,7 @@ import {
   UserCircle2,
   X,
 } from 'lucide-react';
+import { NotificationInbox } from '@/components/notifications/notification-inbox';
 
 const navItems = [
   { href: '/portal', label: 'Dashboard', icon: LayoutDashboard },
@@ -158,6 +159,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           </div>
 
           <div className="flex items-center gap-4">
+            <NotificationInbox />
             <div className="hidden sm:flex flex-col items-end">
               <p className="text-sm font-medium text-[#042042]">{displayName}</p>
               <p className="text-xs text-[#6B7280]">{displayCompany}</p>

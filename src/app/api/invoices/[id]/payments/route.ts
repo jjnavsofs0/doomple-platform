@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { notifyAdmins, notifyClientUsersByEmail } from "@/lib/realtime";
 
 const formatInvoiceResponse = (invoice: any) => ({
   ...invoice,
@@ -64,7 +65,17 @@ export async function POST(
       );
     }
 
-    await prisma.payment.create({
+    if (invoice.status === "DRAFT") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Move the invoice to Sent before recording a payment.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const payment = await prisma.payment.create({
       data: {
         invoiceId: params.id,
         amount,
@@ -91,12 +102,39 @@ export async function POST(
       where: { id: params.id },
       include: {
         items: { orderBy: { order: "asc" } },
-        client: { select: { companyName: true } },
+        client: { select: { companyName: true, email: true } },
         project: { select: { name: true } },
         createdBy: { select: { name: true, email: true } },
         payments: { orderBy: { createdAt: "desc" } },
       },
     });
+
+    if (updated) {
+      await notifyAdmins({
+        title: "Payment recorded",
+        message: `${updated.invoiceNumber} received a ${body.method || "manual"} payment entry.`,
+        type: "PAYMENT",
+        link: `/admin/invoices/${params.id}`,
+        topics: ["dashboard", "invoices", "payments", "notifications"],
+        metadata: {
+          invoiceId: params.id,
+          paymentId: payment.id,
+        },
+      });
+
+      await notifyClientUsersByEmail({
+        email: updated.client?.email,
+        title: "Payment received",
+        message: `We recorded a payment for invoice ${updated.invoiceNumber}.`,
+        type: "PAYMENT",
+        link: "/portal/payments",
+        topics: ["invoices", "payments", "dashboard", "notifications"],
+        metadata: {
+          invoiceId: params.id,
+          paymentId: payment.id,
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,

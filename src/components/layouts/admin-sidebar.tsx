@@ -4,25 +4,119 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
-  Users,
-  Building2,
+  AlertTriangle,
   Briefcase,
-  FileText,
-  Receipt,
-  CreditCard,
-  Settings,
+  Building2,
   ChevronLeft,
   ChevronRight,
+  CreditCard,
+  FileText,
+  LayoutDashboard,
   LogOut,
+  Receipt,
+  Settings,
+  Shield,
+  Users,
 } from "lucide-react";
+import { signOut, useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { DoompleLogo } from "@/components/ui/doomple-logo";
-import { signOut, useSession } from "next-auth/react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface AdminSidebarProps {
   className?: string;
 }
+
+const navGroups = [
+  {
+    label: "Overview",
+    items: [
+      {
+        label: "Dashboard",
+        href: "/admin",
+        icon: LayoutDashboard,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES", "PROJECT_MANAGER", "FINANCE"],
+      },
+    ],
+  },
+  {
+    label: "Revenue Ops",
+    items: [
+      {
+        label: "CRM (Leads)",
+        href: "/admin/leads",
+        icon: Users,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES"],
+      },
+      {
+        label: "Clients",
+        href: "/admin/clients",
+        icon: Building2,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES", "PROJECT_MANAGER", "FINANCE"],
+      },
+      {
+        label: "Quotations",
+        href: "/admin/quotations",
+        icon: FileText,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES", "FINANCE"],
+      },
+      {
+        label: "Invoices",
+        href: "/admin/invoices",
+        icon: Receipt,
+        roles: ["SUPER_ADMIN", "ADMIN", "FINANCE", "PROJECT_MANAGER"],
+      },
+      {
+        label: "Payments",
+        href: "/admin/payments",
+        icon: CreditCard,
+        roles: ["SUPER_ADMIN", "ADMIN", "FINANCE"],
+      },
+    ],
+  },
+  {
+    label: "Delivery",
+    items: [
+      {
+        label: "Projects",
+        href: "/admin/projects",
+        icon: Briefcase,
+        roles: ["SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "SALES"],
+      },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      {
+        label: "Errors",
+        href: "/admin/errors",
+        icon: AlertTriangle,
+        roles: ["SUPER_ADMIN", "ADMIN"],
+      },
+      {
+        label: "Users",
+        href: "/admin/users",
+        icon: Shield,
+        roles: ["SUPER_ADMIN"],
+      },
+      {
+        label: "Settings",
+        href: "/admin/settings",
+        icon: Settings,
+        roles: ["SUPER_ADMIN", "ADMIN"],
+      },
+    ],
+  },
+] as const;
+
+const roleLabels: Record<string, string> = {
+  SUPER_ADMIN: "Super Admin",
+  ADMIN: "Admin",
+  SALES: "Sales",
+  PROJECT_MANAGER: "Project Manager",
+  FINANCE: "Finance",
+};
 
 export function AdminSidebar({ className }: AdminSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -31,153 +125,168 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
 
   const role = (session?.user as { role?: string })?.role || "";
 
-  const allNavItems = [
-    { label: "Dashboard",   href: "/admin/dashboard",   icon: LayoutDashboard, roles: ["SUPER_ADMIN","ADMIN","SALES","PROJECT_MANAGER","FINANCE"] },
-    { label: "CRM (Leads)", href: "/admin/leads",        icon: Users,           roles: ["SUPER_ADMIN","ADMIN","SALES"] },
-    { label: "Clients",     href: "/admin/clients",      icon: Building2,       roles: ["SUPER_ADMIN","ADMIN","SALES","PROJECT_MANAGER","FINANCE"] },
-    { label: "Projects",    href: "/admin/projects",     icon: Briefcase,       roles: ["SUPER_ADMIN","ADMIN","PROJECT_MANAGER","SALES"] },
-    { label: "Quotations",  href: "/admin/quotations",   icon: FileText,        roles: ["SUPER_ADMIN","ADMIN","SALES","FINANCE"] },
-    { label: "Invoices",    href: "/admin/invoices",     icon: Receipt,         roles: ["SUPER_ADMIN","ADMIN","FINANCE","PROJECT_MANAGER"] },
-    { label: "Payments",    href: "/admin/payments",     icon: CreditCard,      roles: ["SUPER_ADMIN","ADMIN","FINANCE"] },
-    { label: "Users",       href: "/admin/users",        icon: Users,           roles: ["SUPER_ADMIN"] },
-    { label: "Settings",    href: "/admin/settings",     icon: Settings,        roles: ["SUPER_ADMIN","ADMIN"] },
-  ];
-
-  // Filter nav items to only show what the current role can access
-  const navItems = role ? allNavItems.filter((item) => item.roles.includes(role)) : allNavItems;
+  const filteredGroups = navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !role || item.roles.includes(role as never)),
+    }))
+    .filter((group) => group.items.length > 0);
 
   const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(href + "/");
+    href === "/admin"
+      ? pathname === "/admin" || pathname === "/admin/dashboard"
+      : pathname === href || pathname.startsWith(`${href}/`);
 
   const initials = session?.user?.name
-    ? session.user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+    ? session.user.name
+        .split(" ")
+        .map((name: string) => name[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
     : "A";
 
   return (
     <aside
       className={cn(
-        "flex flex-col h-screen transition-all duration-300 flex-shrink-0",
-        isCollapsed ? "w-[72px]" : "w-64",
+        "flex h-screen flex-col transition-all duration-300",
+        isCollapsed ? "w-[84px]" : "w-[280px]",
         className
       )}
-      style={{ backgroundColor: "#042042" }}
+      style={{ backgroundColor: "#07223F" }}
     >
-      {/* Logo */}
       <div
         className={cn(
-          "flex items-center h-[72px] px-4 flex-shrink-0",
-          isCollapsed ? "justify-center" : "justify-start"
+          "flex items-center px-5 py-5",
+          isCollapsed ? "justify-center" : "justify-between"
         )}
         style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}
       >
-        <Link href="/admin/dashboard">
+        <Link href="/admin" className="flex items-center">
           {isCollapsed ? (
-            <DoompleLogo variant="mark" size={30} />
+            <DoompleLogo variant="mark" size={34} />
           ) : (
             <DoompleLogo variant="full" theme="dark" size={36} />
           )}
         </Link>
+
+        {!isCollapsed && (
+          <button
+            onClick={() => setIsCollapsed(true)}
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            aria-label="Collapse sidebar"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-0.5">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={isCollapsed ? item.label : undefined}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group",
-                active
-                  ? "text-white"
-                  : "text-white/55 hover:text-white hover:bg-white/5"
-              )}
-              style={active ? { backgroundColor: "rgba(26,191,173,0.15)" } : {}}
-            >
-              <Icon
-                className="w-[18px] h-[18px] flex-shrink-0 transition-colors"
-                style={active ? { color: "#1ABFAD" } : {}}
-              />
+      <nav className="flex-1 overflow-y-auto px-3 py-5">
+        <div className="space-y-6">
+          {filteredGroups.map((group) => (
+            <div key={group.label} className="space-y-3">
               {!isCollapsed && (
-                <span style={active ? { color: "#1ABFAD" } : {}}>{item.label}</span>
+                <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">
+                  {group.label}
+                </p>
               )}
-              {active && !isCollapsed && (
-                <span
-                  className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: "#1ABFAD" }}
-                />
-              )}
-            </Link>
-          );
-        })}
+
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.href);
+
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      title={isCollapsed ? item.label : undefined}
+                      className={cn(
+                        "group relative flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all",
+                        isCollapsed ? "justify-center" : "",
+                        active
+                          ? "bg-[#0F335C] text-white"
+                          : "text-slate-200 hover:bg-white/5 hover:text-white"
+                      )}
+                    >
+                      {active && !isCollapsed && (
+                        <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-[#34D3C3]" />
+                      )}
+                      <Icon
+                        className="h-[18px] w-[18px] flex-shrink-0"
+                        style={active ? { color: "#6DEADB" } : { color: "rgba(226,232,240,0.88)" }}
+                      />
+                      {!isCollapsed && (
+                        <>
+                          <span className={cn("tracking-[0.01em]", active ? "text-white" : "text-inherit")}>
+                            {item.label}
+                          </span>
+                          {active && (
+                            <span className="ml-auto h-2 w-2 rounded-full bg-[#34D3C3]" />
+                          )}
+                        </>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       </nav>
 
-      {/* Collapse toggle */}
-      <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }} className="p-2">
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-white/40 hover:text-white/80 hover:bg-white/5 transition-colors"
-          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {isCollapsed ? (
-            <ChevronRight className="w-4 h-4" />
-          ) : (
-            <>
-              <ChevronLeft className="w-4 h-4" />
-              <span className="text-xs font-medium">Collapse</span>
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* User footer */}
-      <div
-        className="flex-shrink-0 p-3"
-        style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}
-      >
+      <div className="border-t border-white/8 px-3 py-3">
         {isCollapsed ? (
-          <div className="flex flex-col items-center gap-2.5">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
-              style={{ backgroundColor: "#1ABFAD" }}
+          <div className="space-y-2">
+            <button
+              onClick={() => setIsCollapsed(false)}
+              className="flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              aria-label="Expand sidebar"
             >
-              {initials}
-            </div>
+              <ChevronRight className="h-4 w-4" />
+            </button>
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
-              className="text-white/35 hover:text-red-400 transition-colors"
-              title="Logout"
+              className="flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-white/70 transition-colors hover:bg-red-500/10 hover:text-red-300"
+              aria-label="Logout"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="h-4 w-4" />
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-3">
-            <div
-              className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-              style={{ backgroundColor: "#1ABFAD" }}
-            >
-              {initials}
+          <div className="space-y-3 px-1">
+            <div className="flex items-center gap-3">
+              <Avatar size="md" className="h-10 w-10 rounded-2xl border border-white/10 bg-[#1ABFAD]">
+                {session?.user?.image ? (
+                  <AvatarImage src={session.user.image} alt={session?.user?.name || "Admin"} />
+                ) : null}
+                <AvatarFallback className="rounded-2xl bg-[#1ABFAD] text-sm font-bold text-white">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-white">
+                  {session?.user?.name || "Admin"}
+                </p>
+                <p className="truncate text-xs text-white/60">
+                  {roleLabels[role] || role || "Operations"}
+                </p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white truncate">
-                {session?.user?.name || "Admin"}
-              </p>
-              <p className="text-xs truncate" style={{ color: "rgba(255,255,255,0.4)" }}>
-                {session?.user?.email || "admin@doomple.com"}
-              </p>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/admin/profile"
+                className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                Profile
+              </Link>
+              <button
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/70 transition-colors hover:bg-red-500/10 hover:text-red-300"
+              >
+                Logout
+              </button>
             </div>
-            <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
-              className="text-white/35 hover:text-red-400 transition-colors flex-shrink-0"
-              title="Logout"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
           </div>
         )}
       </div>

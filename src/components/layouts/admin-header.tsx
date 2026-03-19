@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { Menu, Bell, Settings, User, LogOut, ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { signOut, useSession } from "next-auth/react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ChevronDown, LogOut, Menu, Settings, User } from "lucide-react";
+import { signOut, useSession } from "next-auth/react";
+import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { NotificationInbox } from "@/components/notifications/notification-inbox";
 
 interface AdminHeaderProps {
   onMenuClick?: () => void;
@@ -12,156 +15,181 @@ interface AdminHeaderProps {
   breadcrumb?: { label: string; href?: string }[];
 }
 
+const pageTitleMap: Array<{ match: RegExp; title: string; kicker: string }> = [
+  { match: /^\/admin$/, title: "Dashboard", kicker: "Overview" },
+  { match: /^\/admin\/dashboard$/, title: "Dashboard", kicker: "Overview" },
+  { match: /^\/admin\/leads/, title: "Lead Workspace", kicker: "CRM" },
+  { match: /^\/admin\/clients/, title: "Client Workspace", kicker: "Accounts" },
+  { match: /^\/admin\/projects/, title: "Projects", kicker: "Delivery" },
+  { match: /^\/admin\/quotations/, title: "Quotations", kicker: "Commercials" },
+  { match: /^\/admin\/invoices/, title: "Invoices", kicker: "Billing" },
+  { match: /^\/admin\/payments/, title: "Payments", kicker: "Collections" },
+  { match: /^\/admin\/users/, title: "Users", kicker: "Access" },
+  { match: /^\/admin\/settings/, title: "Settings", kicker: "System" },
+  { match: /^\/admin\/profile/, title: "Profile", kicker: "Account" },
+];
+
+const roleLabels: Record<string, string> = {
+  SUPER_ADMIN: "Super Admin",
+  ADMIN: "Admin",
+  SALES: "Sales",
+  PROJECT_MANAGER: "Project Manager",
+  FINANCE: "Finance",
+};
+
 export function AdminHeader({
   onMenuClick,
   className,
   breadcrumb,
 }: AdminHeaderProps) {
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const pathname = usePathname();
   const { data: session } = useSession();
 
   const initials = session?.user?.name
-    ? session.user.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+    ? session.user.name
+        .split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
     : "A";
+
+  const pageMeta = useMemo(() => {
+    return (
+      pageTitleMap.find((entry) => entry.match.test(pathname)) || {
+        title: "Admin",
+        kicker: "Workspace",
+      }
+    );
+  }, [pathname]);
 
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 bg-white",
+        "sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur",
         className
       )}
-      style={{ borderBottom: "1px solid #E5E7EB" }}
     >
-      <div className="flex h-[72px] items-center justify-between px-4 sm:px-6 lg:px-8">
-        {/* Left: Mobile menu + Breadcrumb */}
-        <div className="flex items-center gap-3">
+      <div className="flex min-h-[76px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 items-center gap-3">
           {onMenuClick && (
             <button
               onClick={onMenuClick}
-              className="md:hidden p-2 rounded-lg transition-colors hover:bg-gray-100"
+              className="rounded-2xl border border-slate-200 p-2 text-slate-700 transition-colors hover:bg-slate-50 md:hidden"
               aria-label="Toggle menu"
-              style={{ color: "#042042" }}
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="h-5 w-5" />
             </button>
           )}
 
-          {breadcrumb && breadcrumb.length > 0 && (
-            <nav className="hidden sm:flex items-center gap-1.5">
-              {breadcrumb.map((item, index) => (
-                <div key={index} className="flex items-center gap-1.5">
-                  {index > 0 && (
-                    <span className="text-xs" style={{ color: "#D1D5DB" }}>/</span>
-                  )}
-                  {item.href ? (
-                    <Link
-                      href={item.href}
-                      className="text-sm transition-colors hover:text-[#1ABFAD]"
-                      style={{ color: "#6B7280" }}
-                    >
-                      {item.label}
-                    </Link>
-                  ) : (
-                    <span className="text-sm font-semibold" style={{ color: "#042042" }}>
-                      {item.label}
-                    </span>
-                  )}
-                </div>
-              ))}
-            </nav>
-          )}
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1ABFAD]">
+                {pageMeta.kicker}
+              </p>
+              {session?.user?.role && (
+                <span className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-medium text-slate-500">
+                  {roleLabels[session.user.role] || session.user.role}
+                </span>
+              )}
+            </div>
+            <h1 className="truncate text-lg font-semibold tracking-tight text-slate-900 md:text-xl">
+              {pageMeta.title}
+            </h1>
+            {breadcrumb && breadcrumb.length > 0 ? (
+              <nav className="hidden items-center gap-1.5 pt-1 text-xs text-slate-500 sm:flex">
+                {breadcrumb.map((item, index) => (
+                  <div key={`${item.label}-${index}`} className="flex items-center gap-1.5">
+                    {index > 0 && <span className="text-slate-300">/</span>}
+                    {item.href ? (
+                      <Link href={item.href} className="transition-colors hover:text-slate-900">
+                        {item.label}
+                      </Link>
+                    ) : (
+                      <span className="font-medium text-slate-700">{item.label}</span>
+                    )}
+                  </div>
+                ))}
+              </nav>
+            ) : (
+              <p className="hidden pt-1 text-xs text-slate-500 sm:block">
+                Stay on top of activity, ownership, and next actions from this workspace.
+              </p>
+            )}
+          </div>
         </div>
 
-        {/* Right: Notifications + User */}
         <div className="flex items-center gap-2">
-          {/* Notification Bell */}
-          <button
-            className="relative p-2 rounded-lg transition-colors hover:bg-gray-50"
-            aria-label="Notifications"
-            style={{ color: "#6B7280" }}
-          >
-            <Bell className="w-5 h-5" />
-            <span
-              className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full"
-              style={{ backgroundColor: "#1ABFAD" }}
-            />
-          </button>
+          <NotificationInbox />
 
-          {/* User Menu */}
           <div className="relative">
             <button
               onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-              className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-colors hover:bg-gray-50"
+              className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-2.5 py-2 transition-colors hover:bg-slate-50"
             >
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                style={{ backgroundColor: "#1ABFAD" }}
-              >
-                {initials}
-              </div>
-              <div className="hidden sm:block text-left">
-                <p className="text-xs font-semibold leading-tight" style={{ color: "#042042" }}>
+              <Avatar size="md" className="h-9 w-9 rounded-2xl border border-slate-200 bg-[#042042]">
+                {session?.user?.image ? (
+                  <AvatarImage src={session.user.image} alt={session?.user?.name || "Admin"} />
+                ) : null}
+                <AvatarFallback className="rounded-2xl bg-[#042042] text-xs font-bold text-white">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="hidden text-left sm:block">
+                <p className="max-w-[160px] truncate text-xs font-semibold text-slate-900">
                   {session?.user?.name || "Admin"}
                 </p>
-                <p className="text-xs leading-tight" style={{ color: "#6B7280" }}>
+                <p className="max-w-[180px] truncate text-xs text-slate-500">
                   {session?.user?.email || "admin@doomple.com"}
                 </p>
               </div>
-              <ChevronDown className="hidden sm:block w-3.5 h-3.5 flex-shrink-0" style={{ color: "#9CA3AF" }} />
+              <ChevronDown className="hidden h-4 w-4 text-slate-400 sm:block" />
             </button>
 
             {isUserDropdownOpen && (
               <>
-                {/* Backdrop */}
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setIsUserDropdownOpen(false)}
-                />
-                {/* Dropdown */}
-                <div
-                  className="absolute right-0 mt-1.5 w-52 rounded-xl shadow-lg z-50 py-1 overflow-hidden"
-                  style={{ backgroundColor: "#FFFFFF", border: "1px solid #E5E7EB" }}
-                >
-                  <div className="px-4 py-3" style={{ borderBottom: "1px solid #F3F4F6" }}>
-                    <p className="text-sm font-semibold" style={{ color: "#042042" }}>
+                <div className="fixed inset-0 z-40" onClick={() => setIsUserDropdownOpen(false)} />
+                <div className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
+                  <div className="border-b border-slate-100 px-5 py-4">
+                    <p className="text-sm font-semibold text-slate-900">
                       {session?.user?.name || "Admin"}
                     </p>
-                    <p className="text-xs mt-0.5" style={{ color: "#6B7280" }}>
+                    <p className="mt-1 text-xs text-slate-500">
                       {session?.user?.email || "admin@doomple.com"}
                     </p>
+                    <p className="mt-2 text-xs font-medium uppercase tracking-[0.16em] text-[#1ABFAD]">
+                      {roleLabels[session?.user?.role || ""] || session?.user?.role || "Operations"}
+                    </p>
                   </div>
-                  <nav className="py-1">
+                  <div className="p-2">
                     <Link
                       href="/admin/profile"
                       onClick={() => setIsUserDropdownOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-gray-50"
-                      style={{ color: "#374151" }}
+                      className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-slate-700 transition-colors hover:bg-slate-50"
                     >
-                      <User className="w-4 h-4" style={{ color: "#6B7280" }} />
+                      <User className="h-4 w-4 text-slate-500" />
                       Profile
                     </Link>
                     <Link
                       href="/admin/settings"
                       onClick={() => setIsUserDropdownOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-gray-50"
-                      style={{ color: "#374151" }}
+                      className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm text-slate-700 transition-colors hover:bg-slate-50"
                     >
-                      <Settings className="w-4 h-4" style={{ color: "#6B7280" }} />
+                      <Settings className="h-4 w-4 text-slate-500" />
                       Settings
                     </Link>
-                    <div style={{ borderTop: "1px solid #F3F4F6" }} className="my-1" />
                     <button
                       onClick={() => {
                         setIsUserDropdownOpen(false);
                         signOut({ callbackUrl: "/login" });
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors hover:bg-red-50"
-                      style={{ color: "#EF4444" }}
+                      className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm text-red-600 transition-colors hover:bg-red-50"
                     >
-                      <LogOut className="w-4 h-4" />
+                      <LogOut className="h-4 w-4" />
                       Logout
                     </button>
-                  </nav>
+                  </div>
                 </div>
               </>
             )}

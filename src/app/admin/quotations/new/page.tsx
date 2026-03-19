@@ -1,9 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, PageHeader } from "@/components/ui"
 import { Plus, Trash2, ArrowLeft } from "lucide-react"
+import { getCurrencyOptions } from "@/lib/billing"
+import { formatCurrency } from "@/lib/utils"
 
 interface Client {
   id: string
@@ -34,13 +36,12 @@ const templates = [
   "Workforce Consulting",
 ]
 
-const currencyFormatter = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-})
-
-export default function NewQuotationPage() {
+function NewQuotationContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const preselectedClientId = searchParams.get("clientId") || ""
+  const preselectedLeadId = searchParams.get("leadId") || ""
+
   const [clients, setClients] = useState<Client[]>([])
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,11 +50,12 @@ export default function NewQuotationPage() {
 
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
-  const [clientId, setClientId] = useState("")
-  const [leadId, setLeadId] = useState("")
+  const [clientId, setClientId] = useState(preselectedClientId)
+  const [leadId, setLeadId] = useState(preselectedLeadId)
   const [validUntil, setValidUntil] = useState("")
   const [termsNotes, setTermsNotes] = useState("")
   const [template, setTemplate] = useState("")
+  const [currency, setCurrency] = useState("INR")
   const [lineItems, setLineItems] = useState<LineItem[]>([
     {
       id: "1",
@@ -180,6 +182,7 @@ export default function NewQuotationPage() {
           validUntil,
           termsNotes,
           template: template || undefined,
+          currency,
           lineItems: lineItems.map((item) => ({
             description: item.description,
             quantity: item.quantity,
@@ -220,6 +223,7 @@ export default function NewQuotationPage() {
   }
 
   return (
+
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button
@@ -271,6 +275,25 @@ export default function NewQuotationPage() {
                   {templates.map((t) => (
                     <option key={t} value={t}>
                       {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Currency
+                </label>
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                >
+                  {getCurrencyOptions().map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
@@ -473,7 +496,7 @@ export default function NewQuotationPage() {
                 </div>
 
                 <div className="text-right text-sm font-medium text-gray-700">
-                  Total: {currencyFormatter.format(calculateItemTotal(item))}
+                  Total: {formatCurrency(calculateItemTotal(item), currency)}
                 </div>
               </div>
             ))}
@@ -488,20 +511,20 @@ export default function NewQuotationPage() {
           <CardContent className="space-y-2">
             <div className="flex justify-between text-gray-700">
               <span>Subtotal:</span>
-              <span>{currencyFormatter.format(subtotal)}</span>
+              <span>{formatCurrency(subtotal, currency)}</span>
             </div>
             <div className="flex justify-between text-gray-700">
               <span>Tax Amount:</span>
-              <span>{currencyFormatter.format(taxAmount)}</span>
+              <span>{formatCurrency(taxAmount, currency)}</span>
             </div>
             <div className="flex justify-between text-gray-700">
               <span>Discount:</span>
-              <span>-{currencyFormatter.format(totalDiscount)}</span>
+              <span>-{formatCurrency(totalDiscount, currency)}</span>
             </div>
             <div className="border-t border-gray-200 pt-2">
               <div className="flex justify-between text-lg font-bold text-gray-900">
                 <span>Grand Total:</span>
-                <span>{currencyFormatter.format(grandTotal)}</span>
+                <span>{formatCurrency(grandTotal, currency)}</span>
               </div>
             </div>
           </CardContent>
@@ -522,5 +545,13 @@ export default function NewQuotationPage() {
         </div>
       </form>
     </div>
+  )
+}
+
+export default function NewQuotationPage() {
+  return (
+    <Suspense fallback={<div className="space-y-4"><PageHeader title="Create Quotation" /><Card><CardContent className="pt-6">Loading...</CardContent></Card></div>}>
+      <NewQuotationContent />
+    </Suspense>
   )
 }

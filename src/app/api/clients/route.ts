@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { notifyAdmins } from "@/lib/realtime";
 import { clientSchema } from "@/lib/validations";
 
 export async function GET(request: Request) {
@@ -90,6 +91,10 @@ export async function POST(request: Request) {
       postalCode: body.postalCode || body.zipCode || "",
       country: body.country || "",
       gstNumber: body.gstNumber || body.gstin || "",
+      panNumber: body.panNumber || "",
+      bankName: body.bankName || "",
+      bankAccountNumber: body.bankAccountNumber || "",
+      ifscCode: body.ifscCode || "",
     };
 
     if (!normalizedData.companyName || !normalizedData.contactName || !normalizedData.email) {
@@ -137,7 +142,21 @@ export async function POST(request: Request) {
         postalCode: validatedData.zipCode || null,
         country: validatedData.country || null,
         gstNumber: validatedData.gstin || null,
+        panNumber: normalizedData.panNumber || null,
+        bankName: normalizedData.bankName || null,
+        bankAccountNumber: normalizedData.bankAccountNumber || null,
+        ifscCode: normalizedData.ifscCode || null,
         isActive: true,
+      },
+    });
+
+    await notifyAdmins({
+      title: "Client created",
+      message: `${client.companyName} was added to the client roster.`,
+      link: `/admin/clients/${client.id}`,
+      topics: ["dashboard", "clients", "notifications"],
+      metadata: {
+        clientId: client.id,
       },
     });
 

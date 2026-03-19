@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import type { BillingModel, ProjectCategory } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
+import { normalizeCurrency } from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
+import { notifyAdmins, notifyClientUsersByEmail, notifyUserById } from "@/lib/realtime";
 import { projectSchema } from "@/lib/validations";
 
 const validProjectCategories = new Set<ProjectCategory>([
@@ -108,6 +110,7 @@ export async function GET(request: Request) {
       managerName: project.manager?.name || "Unassigned",
       progress: project.progressPercent,
       budget: Number(project.budget || 0),
+      currency: project.currency || "INR",
     }));
 
     return NextResponse.json({
@@ -149,6 +152,7 @@ export async function POST(request: Request) {
       startDate: body.startDate || "",
       estimatedEndDate: body.estimatedEndDate || body.endDate || "",
       priority: body.priority || "MEDIUM",
+      currency: normalizeCurrency(body.currency),
     };
 
     if (!normalizedData.name || !normalizedData.clientId) {
@@ -186,6 +190,7 @@ export async function POST(request: Request) {
     const project = await prisma.project.create({
       data: {
         name: normalizedData.name,
+        currency: normalizedData.currency,
         category: normalizedData.category,
         description: normalizedData.description || null,
         scope: normalizedData.scope || null,
@@ -259,6 +264,44 @@ export async function POST(request: Request) {
         note: "Project created",
       },
     });
+
+    await notifyAdmins({
+      title: "Project created",
+      message: `${project.name} was created for ${project.client?.companyName || "a client"}.`,
+      type: "PROJECT",
+      link: `/admin/projects/${project.id}`,
+      topics: ["dashboard", "projects", "notifications"],
+      metadata: {
+        projectId: project.id,
+        status: project.status,
+      },
+    });
+
+    await notifyClientUsersByEmail({
+      email: clientExists.email,
+      title: "New project created",
+      message: `${project.name} is now available in your Doomple workspace.`,
+      type: "PROJECT",
+      link: "/portal/projects",
+      topics: ["projects", "dashboard", "notifications"],
+      metadata: {
+        projectId: project.id,
+      },
+    });
+
+    if (project.managerId && project.managerId !== session.user.id) {
+      await notifyUserById({
+        userId: project.managerId,
+        title: "Project assigned to you",
+        message: `${project.name} is now part of your delivery queue.`,
+        type: "PROJECT",
+        link: `/admin/projects/${project.id}`,
+        topics: ["projects", "notifications"],
+        metadata: {
+          projectId: project.id,
+        },
+      });
+    }
 
     return NextResponse.json(
       {

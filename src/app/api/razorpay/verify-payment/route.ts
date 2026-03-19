@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { getPaymentDetails, verifyPaymentSignature } from "@/lib/razorpay";
 import { recordRazorpayPayment } from "@/lib/invoice-payments";
 import { canAccessInvoiceForPayment } from "@/lib/invoice-access";
+import { getErrorMessage, getErrorStack, recordAppError } from "@/lib/app-error-log";
+import { notifyAdmins, notifyClientUsersByEmail } from "@/lib/realtime";
 
 export async function POST(request: Request) {
   try {
@@ -70,6 +72,21 @@ export async function POST(request: Request) {
 
     const paymentDetails = await getPaymentDetails(paymentId);
     if (!paymentDetails.success || !paymentDetails.data) {
+      await recordAppError({
+        title: "Razorpay payment verification details failed",
+        message: String(paymentDetails.error || "Failed to fetch payment details"),
+        severity: "CRITICAL",
+        source: "SERVER",
+        route: "/api/razorpay/verify-payment",
+        area: "payments",
+        method: "POST",
+        statusCode: 502,
+        metadata: {
+          invoiceId,
+          orderId,
+          paymentId,
+        },
+      });
       return NextResponse.json(
         { success: false, error: paymentDetails.error || "Failed to fetch payment details" },
         { status: 502 }
@@ -90,6 +107,36 @@ export async function POST(request: Request) {
       paidAt: payment.status === "captured" ? new Date() : null,
     });
 
+    await notifyAdmins({
+      title: payment.status === "captured" ? "Payment captured" : "Payment verification update",
+      message: `Invoice payment ${paymentId} was ${payment.status}.`,
+      type: "PAYMENT",
+      link: `/admin/invoices/${invoiceId}`,
+      topics: ["dashboard", "invoices", "payments", "notifications"],
+      metadata: {
+        invoiceId,
+        paymentId,
+        status: payment.status,
+      },
+    });
+
+    await notifyClientUsersByEmail({
+      email: invoice.client.email,
+      title: payment.status === "captured" ? "Payment successful" : "Payment received",
+      message:
+        payment.status === "captured"
+          ? "Your payment has been verified successfully."
+          : "Your payment was received and is awaiting capture confirmation.",
+      type: "PAYMENT",
+      link: "/portal/payments",
+      topics: ["invoices", "payments", "dashboard", "notifications"],
+      metadata: {
+        invoiceId,
+        paymentId,
+        status: payment.status,
+      },
+    });
+
     return NextResponse.json({
       success: true,
       message:
@@ -106,6 +153,17 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Verify Razorpay payment error:", error);
+    await recordAppError({
+      title: "Verify Razorpay payment error",
+      message: getErrorMessage(error),
+      severity: "CRITICAL",
+      source: "SERVER",
+      route: "/api/razorpay/verify-payment",
+      area: "payments",
+      method: "POST",
+      statusCode: 500,
+      stack: getErrorStack(error),
+    });
     return NextResponse.json(
       { success: false, error: "Failed to verify payment" },
       { status: 500 }

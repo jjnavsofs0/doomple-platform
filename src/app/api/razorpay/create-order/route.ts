@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isGatewaySupportedForCurrency, normalizeCurrency } from "@/lib/billing";
 import { createOrder } from "@/lib/razorpay";
 import { getOutstandingAmount } from "@/lib/invoice-payments";
 import { canAccessInvoiceForPayment } from "@/lib/invoice-access";
+import { getErrorMessage, getErrorStack, recordAppError } from "@/lib/app-error-log";
 
 export async function POST(request: Request) {
   try {
@@ -50,6 +52,7 @@ export async function POST(request: Request) {
     }
 
     const outstandingAmount = getOutstandingAmount(invoice.total, invoice.paidAmount);
+    const invoiceCurrency = normalizeCurrency(invoice.currency);
 
     if (outstandingAmount <= 0) {
       return NextResponse.json(
@@ -61,10 +64,20 @@ export async function POST(request: Request) {
     // Convert amount to paise (smallest currency unit)
     const amountInPaise = Math.round(outstandingAmount * 100);
 
+    if (!(await isGatewaySupportedForCurrency("RAZORPAY", invoiceCurrency))) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Razorpay is not enabled for ${invoiceCurrency} invoices. Update payment gateway settings or use a supported currency.`,
+        },
+        { status: 400 }
+      );
+    }
+
     // Create Razorpay order
     const orderResult = await createOrder({
       amount: amountInPaise,
-      currency: "INR",
+      currency: invoiceCurrency,
       receipt: invoice.invoiceNumber,
       notes: {
         invoiceId: invoice.id,
@@ -75,6 +88,21 @@ export async function POST(request: Request) {
 
     if (!orderResult.success) {
       console.error("Razorpay order creation failed:", orderResult.error);
+      await recordAppError({
+        title: "Razorpay order creation failed",
+        message: String(orderResult.error || "Unknown Razorpay order failure"),
+        severity: "CRITICAL",
+        source: "SERVER",
+        route: "/api/razorpay/create-order",
+        area: "payments",
+        method: "POST",
+        statusCode: 500,
+        metadata: {
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          currency: invoiceCurrency,
+        },
+      });
       return NextResponse.json(
         { success: false, error: orderResult.error },
         { status: 500 }
@@ -102,7 +130,7 @@ export async function POST(request: Request) {
       data: {
         orderId: orderResult.data.id,
         amount: amountInPaise,
-        currency: "INR",
+        currency: invoiceCurrency,
         invoiceId: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
         keyId: process.env.RAZORPAY_KEY_ID,
@@ -110,6 +138,17 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Create Razorpay order error:", error);
+    await recordAppError({
+      title: "Create Razorpay order error",
+      message: getErrorMessage(error),
+      severity: "CRITICAL",
+      source: "SERVER",
+      route: "/api/razorpay/create-order",
+      area: "payments",
+      method: "POST",
+      statusCode: 500,
+      stack: getErrorStack(error),
+    });
     return NextResponse.json(
       { success: false, error: "Failed to create order" },
       { status: 500 }

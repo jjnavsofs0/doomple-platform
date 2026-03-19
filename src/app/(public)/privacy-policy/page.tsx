@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import { COOKIE_POLICY_VERSION } from '@/lib/privacy';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy | Doomple Technologies',
@@ -15,6 +16,13 @@ export default function PrivacyPolicyPage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">Privacy Policy</h1>
         <p className="text-gray-600 mb-8">Last updated: March 17, 2026</p>
+        <div className="mb-8 rounded-2xl border border-[#D9E8F6] bg-[#F8FBFF] px-5 py-4 text-sm leading-6 text-[#52637A]">
+          <p className="font-semibold text-[#042042]">GDPR cookie consent version</p>
+          <p className="mt-1">
+            Cookie consent on Doomple is currently recorded against policy version{" "}
+            <span className="font-semibold text-[#042042]">{COOKIE_POLICY_VERSION}</span>.
+          </p>
+        </div>
 
         <div className="prose prose-lg max-w-none text-gray-700 space-y-8">
           <section>
@@ -92,6 +100,9 @@ export default function PrivacyPolicyPage() {
             </p>
             <p>
               Third-party analytics services may place cookies on your device to track usage patterns. You can opt-out of third-party tracking through industry tools.
+            </p>
+            <p>
+              When you respond to our cookie banner, we record the choice you made, the policy version in force at that time, and limited technical metadata needed to evidence consent and honour your preference.
             </p>
           </section>
 

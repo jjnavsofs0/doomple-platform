@@ -65,23 +65,30 @@ export async function uploadFile(params: {
   const bucket = getBucketName(visibility);
 
   if (s3Client && bucket) {
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: storageKey,
-        Body: params.buffer,
-        ContentType: params.contentType || "application/octet-stream",
-      })
-    );
+    try {
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: storageKey,
+          Body: params.buffer,
+          ContentType: params.contentType || "application/octet-stream",
+        })
+      );
 
-    return {
-      provider: `s3-${visibility}`,
-      storageKey,
-      url:
-        visibility === "public"
-          ? `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${storageKey}`
-          : "",
-    };
+      return {
+        provider: `s3-${visibility}`,
+        storageKey,
+        url:
+          visibility === "public"
+            ? `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${storageKey}`
+            : "",
+      };
+    } catch (error) {
+      console.warn(
+        `S3 upload failed for ${storageKey}; falling back to local storage:`,
+        error instanceof Error ? error.message : error
+      );
+    }
   }
 
   const destination = path.join(LOCAL_UPLOAD_DIR, storageKey);
@@ -128,7 +135,19 @@ export async function getStoredFileUrl(params: {
   fallbackUrl?: string | null;
 }) {
   if (params.provider === "s3-public" && params.storageKey) {
+    const s3Client = getS3Client();
     const bucket = getBucketName("public");
+    if (s3Client && bucket) {
+      return getSignedUrl(
+        s3Client,
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: params.storageKey,
+        }),
+        { expiresIn: 60 * 10 }
+      );
+    }
+
     if (bucket && process.env.AWS_REGION) {
       return `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${params.storageKey}`;
     }

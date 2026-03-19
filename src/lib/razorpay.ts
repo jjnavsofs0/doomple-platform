@@ -29,6 +29,7 @@ export interface CreateOrderParams {
 
 export interface PaymentLinkParams {
   amount: number; // in paise
+  currency: string;
   description: string;
   customer_info: {
     name: string;
@@ -95,7 +96,7 @@ export async function createPaymentLink(params: PaymentLinkParams) {
     const razorpay = getRazorpayInstance();
     const paymentLink = await razorpay.paymentLink.create({
       amount: params.amount,
-      currency: "INR",
+      currency: params.currency,
       description: params.description,
       customer: {
         name: params.customer_info.name,

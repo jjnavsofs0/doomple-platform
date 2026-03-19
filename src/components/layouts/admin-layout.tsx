@@ -19,7 +19,7 @@ export function AdminLayout({
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-[linear-gradient(180deg,#F8FBFF_0%,#F4F7FB_100%)]">
       {/* Sidebar */}
       <div className="hidden md:flex flex-shrink-0">
         <AdminSidebar />
@@ -42,13 +42,11 @@ export function AdminLayout({
 
       {/* Main Content */}
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Header */}
         <AdminHeader
           onMenuClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
           breadcrumb={breadcrumb}
         />
 
-        {/* Content Area */}
         <main
           className={cn(
             "flex-1 overflow-auto",

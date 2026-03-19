@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { recordRazorpayPayment } from "@/lib/invoice-payments";
+import { getErrorMessage, getErrorStack, recordAppError } from "@/lib/app-error-log";
+import { notifyAdmins, notifyClientUsersByEmail } from "@/lib/realtime";
 
 export async function POST(request: Request) {
   try {
@@ -40,6 +42,21 @@ export async function POST(request: Request) {
 
     // If signature is invalid, log and return error
     if (!isSignatureValid) {
+      await recordAppError({
+        title: "Invalid Razorpay webhook signature",
+        message: "Razorpay webhook signature validation failed.",
+        severity: "CRITICAL",
+        source: "SERVER",
+        route: "/api/razorpay/webhook",
+        area: "payments",
+        method: "POST",
+        statusCode: 400,
+        metadata: {
+          eventType,
+          orderId: data.order?.entity?.id || data.payment?.entity?.order_id || null,
+          paymentId: data.payment?.entity?.id || null,
+        },
+      });
       await prisma.razorpayWebhookLog.update({
         where: { id: webhookLog.id },
         data: {
@@ -63,6 +80,15 @@ export async function POST(request: Request) {
         // Find invoice by order ID
         const invoice = await prisma.invoice.findFirst({
           where: { razorpayOrderId: orderId },
+          select: {
+            id: true,
+            invoiceNumber: true,
+            client: {
+              select: {
+                email: true,
+              },
+            },
+          },
         });
 
         if (invoice) {
@@ -73,6 +99,39 @@ export async function POST(request: Request) {
             paymentId,
             status: eventType === "payment.captured" ? "COMPLETED" : "PROCESSING",
             paidAt: eventType === "payment.captured" ? new Date() : null,
+          });
+
+          await notifyAdmins({
+            title:
+              eventType === "payment.captured"
+                ? "Webhook payment captured"
+                : "Webhook payment authorized",
+            message: `Razorpay webhook updated invoice ${invoice.invoiceNumber}.`,
+            type: "PAYMENT",
+            link: `/admin/invoices/${invoice.id}`,
+            topics: ["dashboard", "invoices", "payments", "notifications"],
+            metadata: {
+              invoiceId: invoice.id,
+              paymentId,
+              eventType,
+            },
+          });
+
+          await notifyClientUsersByEmail({
+            email: invoice.client?.email,
+            title:
+              eventType === "payment.captured"
+                ? "Payment confirmed"
+                : "Payment received",
+            message: `Invoice ${invoice.invoiceNumber} has a payment update.`,
+            type: "PAYMENT",
+            link: "/portal/payments",
+            topics: ["invoices", "payments", "dashboard", "notifications"],
+            metadata: {
+              invoiceId: invoice.id,
+              paymentId,
+              eventType,
+            },
           });
 
           // Update webhook log as processed
@@ -92,6 +151,17 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Razorpay webhook error:", error);
+    await recordAppError({
+      title: "Razorpay webhook processing error",
+      message: getErrorMessage(error),
+      severity: "CRITICAL",
+      source: "SERVER",
+      route: "/api/razorpay/webhook",
+      area: "payments",
+      method: "POST",
+      statusCode: 500,
+      stack: getErrorStack(error),
+    });
 
     // Log error
     try {

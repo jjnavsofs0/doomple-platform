@@ -1,3 +1,4 @@
+import "@/lib/server-error-bootstrap";
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
@@ -13,6 +14,7 @@ declare module "next-auth" {
       name?: string | null;
       image?: string | null;
       role: string;
+      emailVerificationStatus?: string;
     };
   }
 
@@ -21,6 +23,8 @@ declare module "next-auth" {
     email: string;
     name: string;
     role: string;
+    image?: string | null;
+    emailVerificationStatus?: string;
   }
 }
 
@@ -28,6 +32,10 @@ declare module "next-auth/jwt" {
   interface JWT {
     id?: string;
     role?: string;
+    name?: string | null;
+    email?: string | null;
+    picture?: string | null;
+    emailVerificationStatus?: string;
   }
 }
 
@@ -52,6 +60,9 @@ export const authOptions: NextAuthOptions = {
             name: true,
             passwordHash: true,
             role: true,
+            avatar: true,
+            isActive: true,
+            emailVerificationStatus: true,
           },
         });
 
@@ -68,11 +79,17 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid password");
         }
 
+        if (!user.isActive) {
+          throw new Error("This account is inactive");
+        }
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
           role: user.role,
+          image: user.avatar,
+          emailVerificationStatus: user.emailVerificationStatus,
         };
       },
     }),
@@ -83,10 +100,22 @@ export const authOptions: NextAuthOptions = {
   },
 
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.name = user.name;
+        token.email = user.email;
+        token.picture = user.image;
+        token.emailVerificationStatus = user.emailVerificationStatus;
+      }
+
+      if (trigger === "update" && session?.user) {
+        token.name = session.user.name;
+        token.email = session.user.email;
+        token.role = session.user.role;
+        token.picture = session.user.image;
+        token.emailVerificationStatus = session.user.emailVerificationStatus;
       }
       return token;
     },
@@ -95,6 +124,10 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
+        session.user.name = token.name;
+        session.user.email = token.email;
+        session.user.image = token.picture;
+        session.user.emailVerificationStatus = token.emailVerificationStatus as string | undefined;
       }
       return session;
     },

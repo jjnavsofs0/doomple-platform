@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/ui/page-header';
 import { AlertCircle, TrendingUp } from 'lucide-react';
+import { useUserLiveRefetch } from '@/hooks/use-live-refetch';
 
 interface Payment {
   id: string;
@@ -42,22 +43,25 @@ export default function PaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchPayments = async () => {
-      try {
-        const response = await fetch('/api/portal/payments');
-        if (!response.ok) throw new Error('Failed to fetch payments');
-        const result = await response.json();
-        setPayments(result.payments || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPayments();
+  const fetchPayments = useCallback(async () => {
+    try {
+      const response = await fetch('/api/portal/payments', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Failed to fetch payments');
+      const result = await response.json();
+      setPayments(result.payments || []);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchPayments();
+  }, [fetchPayments]);
+
+  useUserLiveRefetch(["payments", "invoices", "dashboard"], fetchPayments);
 
   const successfulPayments = payments.filter((p) => p.status === 'success');
   const totalPaid = successfulPayments.reduce((sum, p) => sum + p.amount, 0);

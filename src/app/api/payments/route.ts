@@ -30,6 +30,7 @@ export async function GET(request: Request) {
             id: true,
             invoiceNumber: true,
             total: true,
+            currency: true,
             client: {
               select: {
                 id: true,
@@ -51,8 +52,13 @@ export async function GET(request: Request) {
       ...payment,
       paymentId: payment.razorpayPaymentId || payment.id,
       invoiceNumber: payment.invoice.invoiceNumber,
-      clientName: payment.invoice.client.companyName || "Unknown Client",
+      clientName:
+        payment.invoice.client.companyName ||
+        payment.invoice.client.email ||
+        "Unknown Client",
       amount: Number(payment.amount || 0),
+      currency: payment.invoice.currency || "INR",
+      invoiceTotal: Number(payment.invoice.total || 0),
       method: payment.method || "Unknown",
       razorpayPaymentId: payment.razorpayPaymentId || "",
       status: String(payment.status || "").toLowerCase(),

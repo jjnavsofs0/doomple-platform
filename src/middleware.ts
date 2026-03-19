@@ -9,6 +9,7 @@ const CLIENT_ROLES = ["CLIENT"];
 const ROLE_RESTRICTED_ROUTES: { prefix: string; allowedRoles: string[] }[] = [
   // Users management — Super Admin only
   { prefix: "/admin/users",    allowedRoles: ["SUPER_ADMIN"] },
+  { prefix: "/admin/errors", allowedRoles: ["SUPER_ADMIN", "ADMIN"] },
   // Settings — Super Admin + Admin
   { prefix: "/admin/settings", allowedRoles: ["SUPER_ADMIN", "ADMIN"] },
   // Payments — Super Admin, Admin, Finance
@@ -45,6 +46,8 @@ const PUBLIC_ROUTES = [
 // API routes that are publicly accessible
 const PUBLIC_API_ROUTES = [
   "/api/auth",
+  "/api/cookie-consent",
+  "/api/error-logs",
   "/api/contact",
   "/api/razorpay/webhook",
 ];

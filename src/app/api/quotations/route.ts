@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { recordAuditLog } from "@/lib/audit-log";
+import { normalizeCurrency } from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
+import { notifyAdmins } from "@/lib/realtime";
 import { quotationSchema } from "@/lib/validations";
 
 function generateQuotationNumber(): string {
@@ -26,12 +29,18 @@ export async function GET(request: Request) {
     const clientId = url.searchParams.get("clientId");
     const leadId = url.searchParams.get("leadId");
     const search = url.searchParams.get("search");
+    const deleted = url.searchParams.get("deleted") || "exclude";
     const page = parseInt(url.searchParams.get("page") || "1");
     const limit = parseInt(url.searchParams.get("limit") || "10");
 
     const skip = (page - 1) * limit;
 
     const where: any = {};
+    if (deleted === "only") {
+      where.deletedAt = { not: null };
+    } else if (deleted !== "include") {
+      where.deletedAt = null;
+    }
     if (status) where.status = status;
     if (clientId) where.clientId = clientId;
     if (leadId) where.leadId = leadId;
@@ -69,6 +78,13 @@ export async function GET(request: Request) {
             email: true,
           },
         },
+        deletedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
       skip,
       take: limit,
@@ -85,7 +101,14 @@ export async function GET(request: Request) {
         "Unassigned",
       createdBy: quotation.createdBy?.name || quotation.createdBy?.email || "Unknown User",
       total: Number(quotation.total || 0),
+      currency: quotation.currency || "INR",
       validUntil: quotation.validUntil?.toISOString() || null,
+      deletedAt: quotation.deletedAt?.toISOString() || null,
+      deletedBy:
+        quotation.deletedBy?.name ||
+        quotation.deletedBy?.email ||
+        null,
+      deleteReason: quotation.deleteReason || "",
       status: quotation.status
         .toLowerCase()
         .split("_")
@@ -140,6 +163,7 @@ export async function POST(request: Request) {
       validUntil: body.validUntil || "",
       termsNotes: body.termsNotes || body.notes || "",
       template: body.template || "",
+      currency: normalizeCurrency(body.currency),
       discountAmount:
         body.discountAmount !== undefined
           ? Number(body.discountAmount)
@@ -188,6 +212,7 @@ export async function POST(request: Request) {
     const quotation = await prisma.quotation.create({
       data: {
         quotationNumber,
+        currency: normalizedData.currency,
         title: normalizedData.title,
         description: normalizedData.description || null,
         validUntil: normalizedData.validUntil
@@ -239,6 +264,31 @@ export async function POST(request: Request) {
             name: true,
           },
         },
+      },
+    });
+
+    await recordAuditLog({
+      entityType: "quotation",
+      entityId: quotation.id,
+      action: "created",
+      summary: `Quotation ${quotation.quotationNumber} was created`,
+      userId: session.user.id,
+      metadata: {
+        quotationNumber: quotation.quotationNumber,
+        currency: quotation.currency || "INR",
+        total: Number(quotation.total || 0),
+        status: quotation.status,
+      },
+    });
+
+    await notifyAdmins({
+      title: "Quotation created",
+      message: `${quotation.quotationNumber} was created${quotation.client?.companyName ? ` for ${quotation.client.companyName}` : ""}.`,
+      link: `/admin/quotations/${quotation.id}`,
+      topics: ["dashboard", "quotations", "notifications"],
+      metadata: {
+        quotationId: quotation.id,
+        status: quotation.status,
       },
     });
 

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import type { MilestoneStatus } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { notifyAdmins, notifyClientUsersByEmail } from "@/lib/realtime";
 
 const serializeMilestone = (milestone: any) => ({
   ...milestone,
@@ -39,6 +40,13 @@ export async function GET(
 
     const projectExists = await prisma.project.findUnique({
       where: { id: params.id },
+      include: {
+        client: {
+          select: {
+            email: true,
+          },
+        },
+      },
     });
 
     if (!projectExists) {
@@ -78,6 +86,13 @@ export async function POST(
 
     const projectExists = await prisma.project.findUnique({
       where: { id: params.id },
+      include: {
+        client: {
+          select: {
+            email: true,
+          },
+        },
+      },
     });
 
     if (!projectExists) {
@@ -116,6 +131,31 @@ export async function POST(
       },
     });
 
+    await notifyAdmins({
+      title: "Milestone created",
+      message: `${projectExists.name} has a new milestone: ${milestone.title}.`,
+      type: "PROJECT",
+      link: `/admin/projects/${params.id}`,
+      topics: ["projects", "notifications"],
+      metadata: {
+        projectId: params.id,
+        milestoneId: milestone.id,
+      },
+    });
+
+    await notifyClientUsersByEmail({
+      email: projectExists.client?.email,
+      title: "Project milestone added",
+      message: `${projectExists.name} has a new milestone in your workspace.`,
+      type: "PROJECT",
+      link: "/portal/projects",
+      topics: ["projects", "notifications"],
+      metadata: {
+        projectId: params.id,
+        milestoneId: milestone.id,
+      },
+    });
+
     return NextResponse.json(
       {
         success: true,
@@ -145,6 +185,13 @@ export async function PUT(
 
     const projectExists = await prisma.project.findUnique({
       where: { id: params.id },
+      include: {
+        client: {
+          select: {
+            email: true,
+          },
+        },
+      },
     });
 
     if (!projectExists) {
@@ -192,8 +239,39 @@ export async function PUT(
           body.paymentAmount !== undefined
             ? Number(body.paymentAmount)
             : existingMilestone.paymentAmount,
-        order: body.order || existingMilestone.order,
-        completedAt: nextStatus === "COMPLETED" ? new Date() : existingMilestone.completedAt,
+        order: body.order !== undefined ? Number(body.order) : existingMilestone.order,
+        completedAt:
+          nextStatus === "COMPLETED"
+            ? existingMilestone.completedAt || new Date()
+            : body.status !== undefined
+              ? null
+              : existingMilestone.completedAt,
+      },
+    });
+
+    await notifyAdmins({
+      title: "Milestone updated",
+      message: `${projectExists.name} milestone ${updatedMilestone.title} was updated.`,
+      type: "PROJECT",
+      link: `/admin/projects/${params.id}`,
+      topics: ["projects", "notifications"],
+      metadata: {
+        projectId: params.id,
+        milestoneId: updatedMilestone.id,
+        status: updatedMilestone.status,
+      },
+    });
+
+    await notifyClientUsersByEmail({
+      email: projectExists.client?.email,
+      title: "Project milestone updated",
+      message: `${projectExists.name} has a milestone update in your portal.`,
+      type: "PROJECT",
+      link: "/portal/projects",
+      topics: ["projects", "notifications"],
+      metadata: {
+        projectId: params.id,
+        milestoneId: updatedMilestone.id,
       },
     });
 

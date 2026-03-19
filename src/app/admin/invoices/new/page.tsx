@@ -1,9 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, PageHeader } from "@/components/ui"
 import { Plus, Trash2, ArrowLeft } from "lucide-react"
+import { getCurrencyOptions } from "@/lib/billing"
+import { formatCurrency } from "@/lib/utils"
 
 interface Client {
   id: string
@@ -13,12 +15,16 @@ interface Client {
 interface Project {
   id: string
   name: string
+  clientId: string
+  currency?: string
 }
 
 interface Quotation {
   id: string
   quotationNumber: string
   title: string
+  clientId?: string
+  currency?: string
   total: number
   lineItems: any[]
   subtotal: number
@@ -45,26 +51,27 @@ const billingCategories = [
   "Infrastructure",
 ]
 
-const currencyFormatter = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-})
-
-export default function NewInvoicePage() {
+function NewInvoiceContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const preselectedClientId = searchParams.get("clientId") || ""
+  const preselectedProjectId = searchParams.get("projectId") || ""
+
   const [clients, setClients] = useState<Client[]>([])
+  const [allProjects, setAllProjects] = useState<Project[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [quotations, setQuotations] = useState<Quotation[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const [clientId, setClientId] = useState("")
-  const [projectId, setProjectId] = useState("")
+  const [clientId, setClientId] = useState(preselectedClientId)
+  const [projectId, setProjectId] = useState(preselectedProjectId)
   const [quotationId, setQuotationId] = useState("")
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split("T")[0])
   const [dueDate, setDueDate] = useState("")
   const [billingCategory, setBillingCategory] = useState("")
+  const [currency, setCurrency] = useState("INR")
   const [notes, setNotes] = useState("")
   const [lineItems, setLineItems] = useState<LineItem[]>([
     {
@@ -81,22 +88,34 @@ export default function NewInvoicePage() {
     fetchData()
   }, [])
 
+  // Filter projects whenever clientId changes
+  useEffect(() => {
+    if (clientId) {
+      setProjects(allProjects.filter((p: any) => p.clientId === clientId))
+      // Only clear projectId after data has loaded and it doesn't belong to the selected client
+      if (allProjects.length > 0 && projectId && !allProjects.find((p: any) => p.id === projectId && p.clientId === clientId)) {
+        setProjectId("")
+      }
+    } else {
+      setProjects(allProjects)
+    }
+  }, [clientId, allProjects])
+
   const fetchData = async () => {
     try {
       setLoading(true)
       const [clientsRes, projectsRes, quotationsRes] = await Promise.all([
         fetch("/api/clients"),
-        fetch("/api/projects"),
+        fetch("/api/projects?limit=200"),
         fetch("/api/quotations?status=ACCEPTED"),
       ])
 
-      if (!clientsRes.ok || !projectsRes.ok || !quotationsRes.ok) {
+      if (!clientsRes.ok || !projectsRes.ok) {
         throw new Error("Failed to fetch data")
       }
 
       const clientsData = await clientsRes.json()
       const projectsData = await projectsRes.json()
-      const quotationsData = await quotationsRes.json()
 
       setClients(
         (clientsData.data || []).map((client: any) => ({
@@ -104,24 +123,38 @@ export default function NewInvoicePage() {
           name: client.companyName || client.contactPersonName || client.contactName,
         }))
       )
-      setProjects(
-        (projectsData.data || []).map((project: any) => ({
-          id: project.id,
-          name: project.name,
-        }))
-      )
-      setQuotations(
-        (quotationsData.data || []).map((quotation: any) => ({
-          id: quotation.id,
-          quotationNumber: quotation.quotationNumber,
-          title: quotation.title,
-          total: quotation.total,
-          lineItems: quotation.items || quotation.lineItems || [],
-          subtotal: quotation.subtotal,
-          taxAmount: quotation.taxAmount,
-          totalDiscount: quotation.totalDiscount || quotation.discountAmount || 0,
-        }))
-      )
+
+      const projectList = (projectsData.data || []).map((project: any) => ({
+        id: project.id,
+        name: project.name,
+        clientId: project.clientId,
+        currency: project.currency || "INR",
+      }))
+      setAllProjects(projectList)
+      // Initial filter
+      if (preselectedClientId) {
+        setProjects(projectList.filter((p: any) => p.clientId === preselectedClientId))
+      } else {
+        setProjects(projectList)
+      }
+
+      if (quotationsRes.ok) {
+        const quotationsData = await quotationsRes.json()
+        setQuotations(
+          (quotationsData.data || []).map((quotation: any) => ({
+            id: quotation.id,
+            quotationNumber: quotation.quotationNumber,
+            title: quotation.title,
+            clientId: quotation.clientId,
+            currency: quotation.currency || "INR",
+            total: quotation.total,
+            lineItems: quotation.items || quotation.lineItems || [],
+            subtotal: quotation.subtotal,
+            taxAmount: quotation.taxAmount,
+            totalDiscount: quotation.totalDiscount || quotation.discountAmount || 0,
+          }))
+        )
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data")
     } finally {
@@ -133,6 +166,12 @@ export default function NewInvoicePage() {
     setQuotationId(qId)
     const selected = quotations.find((q) => q.id === qId)
     if (selected) {
+      if (selected.clientId) {
+        setClientId(selected.clientId)
+      }
+      if (selected.currency) {
+        setCurrency(selected.currency)
+      }
       setLineItems(
         selected.lineItems.map((item: any, idx: number) => ({
           id: String(idx + 1),
@@ -145,6 +184,21 @@ export default function NewInvoicePage() {
       )
     }
   }
+
+  useEffect(() => {
+    if (!projectId || quotationId) return
+
+    const selectedProject = allProjects.find((project) => project.id === projectId)
+    if (!selectedProject) return
+
+    if (selectedProject.clientId && selectedProject.clientId !== clientId) {
+      setClientId(selectedProject.clientId)
+    }
+
+    if (selectedProject.currency) {
+      setCurrency(selectedProject.currency)
+    }
+  }, [projectId, quotationId, allProjects, clientId])
 
   const addLineItem = () => {
     const newId = String(Math.max(...lineItems.map((l) => parseInt(l.id)), 0) + 1)
@@ -221,6 +275,7 @@ export default function NewInvoicePage() {
           issueDate,
           dueDate,
           billingCategory,
+          currency,
           notes,
           lineItems: lineItems.map((item) => ({
             description: item.description,
@@ -262,6 +317,7 @@ export default function NewInvoicePage() {
   }
 
   return (
+
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button
@@ -381,6 +437,25 @@ export default function NewInvoicePage() {
                   {billingCategories.map((cat) => (
                     <option key={cat} value={cat}>
                       {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Currency
+                </label>
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                >
+                  {getCurrencyOptions().map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
@@ -518,7 +593,7 @@ export default function NewInvoicePage() {
                 </div>
 
                 <div className="text-right text-sm font-medium text-gray-700">
-                  Total: {currencyFormatter.format(calculateItemTotal(item))}
+                  Total: {formatCurrency(calculateItemTotal(item), currency)}
                 </div>
               </div>
             ))}
@@ -533,20 +608,20 @@ export default function NewInvoicePage() {
           <CardContent className="space-y-2">
             <div className="flex justify-between text-gray-700">
               <span>Subtotal:</span>
-              <span>{currencyFormatter.format(subtotal)}</span>
+              <span>{formatCurrency(subtotal, currency)}</span>
             </div>
             <div className="flex justify-between text-gray-700">
               <span>Tax Amount:</span>
-              <span>{currencyFormatter.format(taxAmount)}</span>
+              <span>{formatCurrency(taxAmount, currency)}</span>
             </div>
             <div className="flex justify-between text-gray-700">
               <span>Discount:</span>
-              <span>-{currencyFormatter.format(totalDiscount)}</span>
+              <span>-{formatCurrency(totalDiscount, currency)}</span>
             </div>
             <div className="border-t border-gray-200 pt-2">
               <div className="flex justify-between text-lg font-bold text-gray-900">
                 <span>Grand Total:</span>
-                <span>{currencyFormatter.format(grandTotal)}</span>
+                <span>{formatCurrency(grandTotal, currency)}</span>
               </div>
             </div>
           </CardContent>
@@ -567,5 +642,20 @@ export default function NewInvoicePage() {
         </div>
       </form>
     </div>
+  )
+}
+
+export default function NewInvoicePage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-4">
+        <PageHeader title="Create Invoice" />
+        <Card>
+          <CardContent className="pt-6">Loading...</CardContent>
+        </Card>
+      </div>
+    }>
+      <NewInvoiceContent />
+    </Suspense>
   )
 }

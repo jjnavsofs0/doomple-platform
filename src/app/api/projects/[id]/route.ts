@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import type { BillingModel, ProjectCategory, ProjectStatus } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
+import { normalizeCurrency } from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
+import { notifyAdmins, notifyClientUsersByEmail, notifyUserById } from "@/lib/realtime";
 
 const normalizeProjectCategory = (
   category: unknown,
@@ -146,6 +148,7 @@ export async function GET(
         managerName: project.manager?.name || "Unassigned",
         progress: project.progressPercent,
         budget: Number(project.budget || 0),
+        currency: project.currency || "INR",
         institutionType: project.uepDetail?.institutionType || null,
         selectedModules: project.uepDetail?.selectedModules || [],
         customizationScope: project.uepDetail?.customizationScope || null,
@@ -193,6 +196,10 @@ export async function PUT(
       where: { id: params.id },
       data: {
         name: body.name || existingProject.name,
+        currency:
+          body.currency !== undefined
+            ? normalizeCurrency(body.currency)
+            : existingProject.currency,
         description:
           body.description !== undefined
             ? body.description
@@ -226,6 +233,7 @@ export async function PUT(
           select: {
             id: true,
             companyName: true,
+            email: true,
           },
         },
         manager: {
@@ -248,6 +256,48 @@ export async function PUT(
           projectId: params.id,
           changedById: session.user.id,
           note: body.statusNote || null,
+        },
+      });
+    }
+
+    await notifyAdmins({
+      title: "Project updated",
+      message: `${updatedProject.name} delivery details were updated.`,
+      type: "PROJECT",
+      link: `/admin/projects/${updatedProject.id}`,
+      topics: ["dashboard", "projects", "notifications"],
+      metadata: {
+        projectId: updatedProject.id,
+        status: updatedProject.status,
+      },
+    });
+
+    await notifyClientUsersByEmail({
+      email: updatedProject.client?.email,
+      title: "Project update",
+      message: `${updatedProject.name} has a fresh delivery update in your portal.`,
+      type: "PROJECT",
+      link: "/portal/projects",
+      topics: ["projects", "dashboard", "notifications"],
+      metadata: {
+        projectId: updatedProject.id,
+      },
+    });
+
+    if (
+      body.managerId &&
+      body.managerId !== existingProject.managerId &&
+      body.managerId !== session.user.id
+    ) {
+      await notifyUserById({
+        userId: body.managerId,
+        title: "Project assigned to you",
+        message: `${updatedProject.name} was assigned to you.`,
+        type: "PROJECT",
+        link: `/admin/projects/${updatedProject.id}`,
+        topics: ["projects", "notifications"],
+        metadata: {
+          projectId: updatedProject.id,
         },
       });
     }
@@ -286,6 +336,13 @@ export async function DELETE(
 
     const project = await prisma.project.findUnique({
       where: { id: params.id },
+      include: {
+        client: {
+          select: {
+            email: true,
+          },
+        },
+      },
     });
 
     if (!project) {
@@ -306,6 +363,28 @@ export async function DELETE(
     // Delete the project
     await prisma.project.delete({
       where: { id: params.id },
+    });
+
+    await notifyAdmins({
+      title: "Project deleted",
+      message: `${project.name} was removed from delivery tracking.`,
+      type: "PROJECT",
+      topics: ["dashboard", "projects", "notifications"],
+      metadata: {
+        projectId: project.id,
+      },
+    });
+
+    await notifyClientUsersByEmail({
+      email: project.client?.email,
+      title: "Project removed",
+      message: `${project.name} is no longer active in your client workspace.`,
+      type: "PROJECT",
+      link: "/portal/projects",
+      topics: ["projects", "dashboard", "notifications"],
+      metadata: {
+        projectId: project.id,
+      },
     });
 
     return NextResponse.json({

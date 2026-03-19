@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { canAccessInvoiceForPayment } from "@/lib/invoice-access";
-import { ensureInvoicePdfAttachment } from "@/lib/invoice-pdf";
+import { ensureInvoicePdfAttachment, generateInvoicePdf } from "@/lib/invoice-pdf";
 
 export const dynamic = "force-dynamic";
 
@@ -42,13 +42,21 @@ export async function GET(
       );
     }
 
-    const generated = await ensureInvoicePdfAttachment(params.id);
+    const generated = await generateInvoicePdf(params.id);
     if (!generated) {
       return NextResponse.json(
         { success: false, error: "Invoice not found" },
         { status: 404 }
       );
     }
+
+    // Storage sync should never block preview/download.
+    void ensureInvoicePdfAttachment(params.id).catch((error) => {
+      console.warn(
+        "Invoice PDF attachment sync failed during preview/download:",
+        error instanceof Error ? error.message : error
+      );
+    });
 
     const shouldDownload = new URL(request.url).searchParams.get("download") === "1";
 

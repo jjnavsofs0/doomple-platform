@@ -1,11 +1,13 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/ui/page-header';
+import { useToast } from '@/components/ui/toast';
 import { AlertCircle, Download, Upload, FileText, Calendar } from 'lucide-react';
+import { useUserLiveRefetch } from '@/hooks/use-live-refetch';
 
 interface Document {
   id: string;
@@ -35,6 +37,7 @@ const getFileIcon = (type: string) => {
 };
 
 export default function DocumentsPage() {
+  const { toast } = useToast();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,22 +45,25 @@ export default function DocumentsPage() {
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const fetchDocuments = async () => {
-      try {
-        const response = await fetch('/api/portal/documents');
-        if (!response.ok) throw new Error('Failed to fetch documents');
-        const result = await response.json();
-        setDocuments(result.documents || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDocuments();
+  const fetchDocuments = useCallback(async () => {
+    try {
+      const response = await fetch('/api/portal/documents', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Failed to fetch documents');
+      const result = await response.json();
+      setDocuments(result.documents || []);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
+
+  useUserLiveRefetch(["documents"], fetchDocuments);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -80,15 +86,22 @@ export default function DocumentsPage() {
       if (!response.ok) throw new Error('Upload failed');
 
       const result = await response.json();
-      setDocuments([...documents, ...result.documents]);
-      setUploadSuccess(`${files.length} file(s) uploaded successfully`);
-      setTimeout(() => setUploadSuccess(null), 3000);
+      setDocuments((current) => [...current, ...(result.documents || [])]);
+      toast({
+        type: 'success',
+        title: 'Documents uploaded',
+        description: `${files.length} file(s) uploaded successfully.`,
+      });
 
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
+      toast({
+        type: 'error',
+        title: 'Could not upload documents',
+        description: err instanceof Error ? err.message : 'Upload failed',
+      });
     } finally {
       setUploading(false);
     }

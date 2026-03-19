@@ -1,12 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { Plus, Edit2, Trash2, ChevronUp, ChevronDown } from "lucide-react"
+import { Plus, Edit2, Trash2, ChevronUp, ChevronDown, CheckCircle2, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useToast } from "@/components/ui/toast"
+import { formatCurrency } from "@/lib/utils"
 
 interface Milestone {
   id: string
@@ -14,7 +16,7 @@ interface Milestone {
   description?: string
   dueDate: string
   paymentAmount: number
-  status: "pending" | "in_progress" | "completed" | "cancelled"
+  status: "pending" | "in_progress" | "completed" | "skipped"
   order: number
 }
 
@@ -25,6 +27,7 @@ interface MilestoneListProps {
   onDeleteMilestone?: (id: string) => Promise<void>
   onReorderMilestones?: (milestones: Milestone[]) => Promise<void>
   isLoading?: boolean
+  currency?: string
 }
 
 const MilestoneList = React.forwardRef<HTMLDivElement, MilestoneListProps>(
@@ -36,9 +39,11 @@ const MilestoneList = React.forwardRef<HTMLDivElement, MilestoneListProps>(
       onDeleteMilestone,
       onReorderMilestones,
       isLoading = false,
+      currency = "INR",
     },
     ref
   ) => {
+    const { toast } = useToast()
     const [isFormOpen, setIsFormOpen] = React.useState(false)
     const [formData, setFormData] = React.useState<Partial<Milestone>>({
       title: "",
@@ -75,8 +80,18 @@ const MilestoneList = React.forwardRef<HTMLDivElement, MilestoneListProps>(
       try {
         if (editingId && onUpdateMilestone) {
           await onUpdateMilestone(editingId, formData)
+          toast({
+            type: "success",
+            title: "Milestone updated",
+            description: "The milestone changes were saved.",
+          })
         } else if (onAddMilestone) {
           await onAddMilestone(formData)
+          toast({
+            type: "success",
+            title: "Milestone added",
+            description: "The milestone was added to the project plan.",
+          })
         }
         setIsFormOpen(false)
         setFormData({
@@ -86,6 +101,13 @@ const MilestoneList = React.forwardRef<HTMLDivElement, MilestoneListProps>(
           paymentAmount: 0,
           status: "pending",
         })
+      } catch (err) {
+        toast({
+          type: "error",
+          title: editingId ? "Could not update milestone" : "Could not add milestone",
+          description:
+            err instanceof Error ? err.message : "Please try again.",
+        })
       } finally {
         setIsSubmitting(false)
       }
@@ -93,7 +115,21 @@ const MilestoneList = React.forwardRef<HTMLDivElement, MilestoneListProps>(
 
     const handleDelete = async (id: string) => {
       if (confirm("Are you sure you want to delete this milestone?")) {
-        onDeleteMilestone?.(id)
+        try {
+          await onDeleteMilestone?.(id)
+          toast({
+            type: "success",
+            title: "Milestone deleted",
+            description: "The milestone was removed from the project.",
+          })
+        } catch (err) {
+          toast({
+            type: "error",
+            title: "Could not delete milestone",
+            description:
+              err instanceof Error ? err.message : "Please try again.",
+          })
+        }
       }
     }
 
@@ -114,7 +150,47 @@ const MilestoneList = React.forwardRef<HTMLDivElement, MilestoneListProps>(
         ]
       }
 
-      onReorderMilestones?.(newMilestones)
+      try {
+        await onReorderMilestones?.(newMilestones)
+        toast({
+          type: "success",
+          title: "Milestone order updated",
+          description: "The milestone sequence was saved.",
+        })
+      } catch (err) {
+        toast({
+          type: "error",
+          title: "Could not reorder milestones",
+          description:
+            err instanceof Error ? err.message : "Please try again.",
+        })
+      }
+    }
+
+    const handleToggleStatus = async (milestone: Milestone) => {
+      try {
+        await onUpdateMilestone?.(milestone.id, {
+          status: milestone.status === "completed" ? "pending" : "completed",
+        })
+        toast({
+          type: "success",
+          title:
+            milestone.status === "completed"
+              ? "Milestone reopened"
+              : "Milestone marked complete",
+          description:
+            milestone.status === "completed"
+              ? "The milestone is back in the active plan."
+              : "The milestone status has been updated.",
+        })
+      } catch (err) {
+        toast({
+          type: "error",
+          title: "Could not update milestone status",
+          description:
+            err instanceof Error ? err.message : "Please try again.",
+        })
+      }
     }
 
     if (isLoading) {
@@ -184,6 +260,27 @@ const MilestoneList = React.forwardRef<HTMLDivElement, MilestoneListProps>(
                   required
                 />
 
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Status
+                  </label>
+                  <select
+                    value={formData.status || "pending"}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        status: e.target.value as Milestone["status"],
+                      })
+                    }
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="skipped">Skipped</option>
+                  </select>
+                </div>
+
                 <div className="flex gap-2 pt-2">
                   <Button type="submit" disabled={isSubmitting}>
                     {isSubmitting ? "Saving..." : "Save"}
@@ -230,12 +327,28 @@ const MilestoneList = React.forwardRef<HTMLDivElement, MilestoneListProps>(
                           <span className="text-muted-foreground">
                             Payment Amount:
                           </span>{" "}
-                          {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(milestone.paymentAmount)}
+                          {formatCurrency(milestone.paymentAmount, currency)}
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleToggleStatus(milestone)}
+                        title={
+                          milestone.status === "completed"
+                            ? "Mark as pending"
+                            : "Mark as completed"
+                        }
+                      >
+                        {milestone.status === "completed" ? (
+                          <RotateCcw className="h-4 w-4 text-amber-600" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        )}
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"

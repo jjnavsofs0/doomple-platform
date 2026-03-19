@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { notifyAdmins, notifyClientUsersByEmail } from "@/lib/realtime";
 
 export async function GET(
   request: Request,
@@ -15,6 +16,13 @@ export async function GET(
 
     const projectExists = await prisma.project.findUnique({
       where: { id: params.id },
+      include: {
+        client: {
+          select: {
+            email: true,
+          },
+        },
+      },
     });
 
     if (!projectExists) {
@@ -87,6 +95,13 @@ export async function POST(
 
     const projectExists = await prisma.project.findUnique({
       where: { id: params.id },
+      include: {
+        client: {
+          select: {
+            email: true,
+          },
+        },
+      },
     });
 
     if (!projectExists) {
@@ -122,6 +137,33 @@ export async function POST(
         },
       },
     });
+
+    await notifyAdmins({
+      title: "Project note added",
+      message: `A new note was added to ${projectExists.name}.`,
+      type: "PROJECT",
+      link: `/admin/projects/${params.id}`,
+      topics: ["projects", "notifications"],
+      metadata: {
+        projectId: params.id,
+        noteId: note.id,
+      },
+    });
+
+    if (note.isClientVisible) {
+      await notifyClientUsersByEmail({
+        email: projectExists.client?.email,
+        title: "Project update posted",
+        message: `${projectExists.name} has a new client-visible update.`,
+        type: "PROJECT",
+        link: "/portal/projects",
+        topics: ["projects", "notifications"],
+        metadata: {
+          projectId: params.id,
+          noteId: note.id,
+        },
+      });
+    }
 
     return NextResponse.json(
       {

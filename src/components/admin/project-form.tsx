@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useToast } from "@/components/ui/toast"
+import { getCurrencyOptions } from "@/lib/billing"
 
 type ProjectCategory =
   | "UEP_IMPLEMENTATION"
@@ -30,6 +32,7 @@ type BillingModel =
 interface ProjectFormData {
   name: string
   clientId: string
+  currency?: string
   category: ProjectCategory
   description: string
   scope: string
@@ -97,10 +100,12 @@ const ProjectForm = React.forwardRef<HTMLFormElement, ProjectFormProps>(
     },
     ref
   ) => {
+    const { toast } = useToast()
     const [formData, setFormData] = React.useState<ProjectFormData>(
       initialData as ProjectFormData || {
         name: "",
         clientId: "",
+        currency: "INR",
         category: "CUSTOM_DEVELOPMENT",
         description: "",
         scope: "",
@@ -153,10 +158,20 @@ const ProjectForm = React.forwardRef<HTMLFormElement, ProjectFormProps>(
 
       try {
         await onSubmit(formData)
+        toast({
+          type: "success",
+          title: "Project saved",
+          description: "The project details were saved successfully.",
+        })
       } catch (err) {
-        setError(
+        const message =
           err instanceof Error ? err.message : "An error occurred while saving"
-        )
+        setError(message)
+        toast({
+          type: "error",
+          title: "Could not save project",
+          description: message,
+        })
       } finally {
         setIsSubmitting(false)
       }
@@ -204,6 +219,15 @@ const ProjectForm = React.forwardRef<HTMLFormElement, ProjectFormProps>(
               value={formData.clientId}
               onChange={handleChange}
               placeholder="Select a client"
+              required
+            />
+
+            <Select
+              label="Currency"
+              name="currency"
+              options={getCurrencyOptions()}
+              value={formData.currency || "INR"}
+              onChange={handleChange}
               required
             />
 

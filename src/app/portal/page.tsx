@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import {
   Sparkles,
   TrendingUp,
 } from 'lucide-react';
+import { useUserLiveRefetch } from '@/hooks/use-live-refetch';
 
 interface DashboardData {
   welcomeMessage: string;
@@ -65,22 +66,25 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const response = await fetch('/api/portal/dashboard');
-        if (!response.ok) throw new Error('Failed to fetch dashboard');
-        const result = await response.json();
-        setData(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboard();
+  const fetchDashboard = useCallback(async () => {
+    try {
+      const response = await fetch('/api/portal/dashboard', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Failed to fetch dashboard');
+      const result = await response.json();
+      setData(result);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
+
+  useUserLiveRefetch(["dashboard", "projects", "invoices", "payments"], fetchDashboard);
 
   if (error) {
     return (
