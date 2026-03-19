@@ -305,8 +305,7 @@ export default function AdminDashboard() {
                   <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full"
-                      style={{ backgroundColor: "#1ABFAD" }}
-                      style={{ width: `${project.progress}%` }}
+                      style={{ backgroundColor: "#1ABFAD", width: `${project.progress}%` }}
                     />
                   </div>
                   <span className="text-xs font-medium">{project.progress}%</span>
