@@ -6,7 +6,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/ui/page-header';
-import { AlertCircle, Calendar } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowRight,
+  Calendar,
+  FolderKanban,
+  Layers3,
+  TimerReset,
+} from 'lucide-react';
 
 interface Project {
   id: string;
@@ -71,89 +78,193 @@ export default function ProjectsPage() {
     fetchProjects();
   }, []);
 
+  const activeProjects = projects.filter((project) => project.status === 'active').length;
+  const completedProjects = projects.filter((project) => project.status === 'completed').length;
+  const averageProgress = projects.length
+    ? Math.round(projects.reduce((total, project) => total + project.progress, 0) / projects.length)
+    : 0;
+
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6">
       <PageHeader
         title="My Projects"
         description="Track the progress of all your projects in one place"
       />
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="text-red-600 mt-0.5" size={20} />
+      <section className="overflow-hidden rounded-[32px] border border-[#D9E8F6] bg-[linear-gradient(135deg,#06284A_0%,#0B3763_54%,#115A84_100%)] p-8 text-white shadow-[0_24px_80px_rgba(4,32,66,0.18)]">
+        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <div>
-            <h3 className="font-semibold text-red-900">Error</h3>
-            <p className="text-red-700 text-sm">{error}</p>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-1.5 text-sm text-[#7CE6DA]">
+              <FolderKanban className="h-4 w-4" />
+              Delivery overview
+            </div>
+            <h2 className="mt-5 text-3xl font-bold tracking-tight">
+              See what is active, what is complete, and what needs attention next.
+            </h2>
+            <p className="mt-3 max-w-2xl text-base leading-7 text-white/70">
+              Each project card shows progress, category, dates, and direct access to detailed
+              milestones and notes.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+            {[
+              {
+                label: 'Total Projects',
+                value: loading ? '...' : String(projects.length),
+                icon: Layers3,
+              },
+              {
+                label: 'Active',
+                value: loading ? '...' : String(activeProjects),
+                icon: FolderKanban,
+              },
+              {
+                label: 'Avg. Progress',
+                value: loading ? '...' : `${averageProgress}%`,
+                icon: TimerReset,
+              },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="rounded-3xl border border-white/10 bg-white/10 p-5 backdrop-blur"
+              >
+                <item.icon className="h-5 w-5 text-[#7CE6DA]" />
+                <p className="mt-4 text-sm text-white/65">{item.label}</p>
+                <p className="mt-1 text-2xl font-bold">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {!loading && projects.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="rounded-3xl border-[#DDE8F2] bg-white/90 shadow-sm">
+            <CardContent className="p-6">
+              <p className="text-sm text-[#64748B]">Active delivery lanes</p>
+              <p className="mt-2 text-3xl font-bold text-[#042042]">{activeProjects}</p>
+              <p className="mt-2 text-sm text-[#6B7280]">
+                Currently in motion across discovery, build, or review.
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-3xl border-[#DDE8F2] bg-white/90 shadow-sm">
+            <CardContent className="p-6">
+              <p className="text-sm text-[#64748B]">Completed projects</p>
+              <p className="mt-2 text-3xl font-bold text-[#042042]">{completedProjects}</p>
+              <p className="mt-2 text-sm text-[#6B7280]">
+                Finished engagements that reached delivery or sign-off.
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-3xl border-[#DDE8F2] bg-white/90 shadow-sm">
+            <CardContent className="p-6">
+              <p className="text-sm text-[#64748B]">Portfolio progress</p>
+              <p className="mt-2 text-3xl font-bold text-[#042042]">{averageProgress}%</p>
+              <p className="mt-2 text-sm text-[#6B7280]">
+                Average completion level across your current project list.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex items-start gap-4 rounded-3xl border border-red-200 bg-[linear-gradient(180deg,#FFF6F6_0%,#FFF1F1_100%)] p-6 shadow-sm">
+          <AlertCircle className="mt-0.5 text-red-600" size={20} />
+          <div>
+            <h3 className="font-semibold text-red-900">Unable to load projects</h3>
+            <p className="mt-1 text-sm text-red-700">{error}</p>
+            <p className="mt-2 text-sm text-red-600/80">
+              Refresh the page in a moment and your project list should reappear.
+            </p>
           </div>
         </div>
       )}
 
-      {/* Projects Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
         {loading ? (
           <>
-            <Skeleton className="h-72 rounded-lg" />
-            <Skeleton className="h-72 rounded-lg" />
-            <Skeleton className="h-72 rounded-lg" />
+            <Skeleton className="h-80 rounded-[28px]" />
+            <Skeleton className="h-80 rounded-[28px]" />
+            <Skeleton className="h-80 rounded-[28px]" />
           </>
         ) : projects.length > 0 ? (
           projects.map((project) => (
             <Link key={project.id} href={`/portal/projects/${project.id}`}>
-              <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer">
-                <CardContent className="p-6 space-y-4">
-                  {/* Header */}
+              <Card className="h-full cursor-pointer rounded-[28px] border-[#DDE8F2] bg-white/90 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(15,23,42,0.10)]">
+                <CardContent className="space-y-5 p-6">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{project.name}</h3>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge className={getCategoryColor(project.category)}>
-                        {project.category}
-                      </Badge>
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div className="rounded-2xl bg-[#EAF7F5] p-3 text-[#0D6C62]">
+                        <FolderKanban className="h-5 w-5" />
+                      </div>
                       <Badge className={getStatusColor(project.status)}>
                         {project.status.replace('-', ' ')}
                       </Badge>
                     </div>
+                    <h3 className="text-xl font-semibold text-[#042042]">{project.name}</h3>
+                    {project.description && (
+                      <p className="mt-2 line-clamp-3 text-sm leading-6 text-[#64748B]">
+                        {project.description}
+                      </p>
+                    )}
                   </div>
 
-                  {/* Progress Bar */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-600">Progress</span>
-                      <span className="text-sm font-bold text-gray-900">{project.progress}%</span>
+                  <div className="rounded-2xl border border-[#E6EEF7] bg-[#F8FBFF] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#94A3B8]">
+                      Category
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge className={getCategoryColor(project.category)}>
+                        {project.category}
+                      </Badge>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  </div>
+
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-sm font-medium text-[#64748B]">Progress</span>
+                      <span className="text-sm font-bold text-[#042042]">{project.progress}%</span>
+                    </div>
+                    <div className="h-2.5 w-full rounded-full bg-[#D9E6F3]">
                       <div
-                        className="bg-gradient-to-r from-blue-500 to-blue-600 h-2.5 rounded-full transition-all"
+                        className="h-2.5 rounded-full bg-[linear-gradient(90deg,#1ABFAD,#3BB2F6)] transition-all"
                         style={{ width: `${project.progress}%` }}
                       />
                     </div>
                   </div>
 
-                  {/* Dates */}
-                  <div className="space-y-2 pt-2 border-t border-gray-200">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <div className="space-y-3 rounded-2xl border border-[#E6EEF7] p-4">
+                    <div className="flex items-center gap-2 text-sm text-[#64748B]">
                       <Calendar size={16} />
                       <span>Started: {project.startDate}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2 text-sm text-[#64748B]">
                       <Calendar size={16} />
                       <span>Est. End: {project.estimatedEndDate}</span>
                     </div>
                   </div>
 
-                  {/* CTA */}
-                  <div className="pt-2">
-                    <div className="text-blue-600 hover:text-blue-700 font-medium text-sm flex items-center gap-1">
-                      View Details →
-                    </div>
+                  <div className="inline-flex items-center gap-1 text-sm font-semibold text-[#0C6AA6]">
+                    View Details
+                    <ArrowRight className="h-4 w-4" />
                   </div>
                 </CardContent>
               </Card>
             </Link>
           ))
         ) : (
-          <div className="col-span-full flex flex-col items-center justify-center py-12">
-            <p className="text-gray-500 text-lg">No projects yet</p>
-            <p className="text-gray-400 text-sm mt-1">Your projects will appear here once created</p>
+          <div className="col-span-full rounded-[32px] border border-dashed border-[#C9DAED] bg-white/80 px-6 py-16 text-center shadow-sm">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#EAF7F5] text-[#0D6C62]">
+              <FolderKanban className="h-7 w-7" />
+            </div>
+            <p className="mt-5 text-xl font-semibold text-[#042042]">No projects yet</p>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#64748B]">
+              Once a project is created for your account, it will show up here with milestones,
+              progress updates, and important dates.
+            </p>
           </div>
         )}
       </div>

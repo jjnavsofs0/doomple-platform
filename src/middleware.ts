@@ -4,6 +4,32 @@ import { NextRequest, NextResponse } from "next/server";
 const ADMIN_ROLES = ["SUPER_ADMIN", "ADMIN", "SALES", "PROJECT_MANAGER", "FINANCE"];
 const CLIENT_ROLES = ["CLIENT"];
 
+// ─── RBAC: which roles can access which admin route prefixes ─────────────────
+// If a path is NOT listed here, ALL admin roles can access it.
+const ROLE_RESTRICTED_ROUTES: { prefix: string; allowedRoles: string[] }[] = [
+  // Users management — Super Admin only
+  { prefix: "/admin/users",    allowedRoles: ["SUPER_ADMIN"] },
+  // Settings — Super Admin + Admin
+  { prefix: "/admin/settings", allowedRoles: ["SUPER_ADMIN", "ADMIN"] },
+  // Payments — Super Admin, Admin, Finance
+  { prefix: "/admin/payments", allowedRoles: ["SUPER_ADMIN", "ADMIN", "FINANCE"] },
+  // Invoices — Super Admin, Admin, Finance, Project Manager
+  { prefix: "/admin/invoices", allowedRoles: ["SUPER_ADMIN", "ADMIN", "FINANCE", "PROJECT_MANAGER"] },
+  // Quotations — Super Admin, Admin, Sales, Finance
+  { prefix: "/admin/quotations", allowedRoles: ["SUPER_ADMIN", "ADMIN", "SALES", "FINANCE"] },
+  // Projects — Super Admin, Admin, Project Manager, Sales
+  { prefix: "/admin/projects", allowedRoles: ["SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "SALES"] },
+  // Clients — Super Admin, Admin, Sales, Project Manager, Finance
+  { prefix: "/admin/clients",  allowedRoles: ["SUPER_ADMIN", "ADMIN", "SALES", "PROJECT_MANAGER", "FINANCE"] },
+  // Leads (CRM) — Super Admin, Admin, Sales
+  { prefix: "/admin/leads",    allowedRoles: ["SUPER_ADMIN", "ADMIN", "SALES"] },
+  // Dashboard sub-sections
+  { prefix: "/admin/dashboard/billing",  allowedRoles: ["SUPER_ADMIN", "ADMIN", "FINANCE"] },
+  { prefix: "/admin/dashboard/sales",    allowedRoles: ["SUPER_ADMIN", "ADMIN", "SALES"] },
+  { prefix: "/admin/dashboard/projects", allowedRoles: ["SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER"] },
+];
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Public routes that don't require authentication
 const PUBLIC_ROUTES = [
   "/",
@@ -58,6 +84,15 @@ export async function middleware(request: NextRequest) {
     const userRole = (token.role as string) || "";
     if (!ADMIN_ROLES.includes(userRole)) {
       return NextResponse.redirect(new URL("/", request.url));
+    }
+
+    // Granular RBAC: check if this specific route has restrictions
+    const restriction = ROLE_RESTRICTED_ROUTES.find((r) =>
+      pathname.startsWith(r.prefix)
+    );
+    if (restriction && !restriction.allowedRoles.includes(userRole)) {
+      // Redirect to admin dashboard with a 403-like experience
+      return NextResponse.redirect(new URL("/admin/dashboard?error=forbidden", request.url));
     }
 
     return NextResponse.next();

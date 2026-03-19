@@ -20,6 +20,9 @@ export async function getPortalClient() {
       email: true,
       companyName: true,
       contactName: true,
+      phone: true,
+      billingAddress: true,
+      gstNumber: true,
     },
   });
 
@@ -27,5 +30,13 @@ export async function getPortalClient() {
     return { error: "Client account not linked", status: 404 as const };
   }
 
-  return { client };
+  return {
+    client,
+    user: {
+      id: session.user.id,
+      name: session.user.name || client.contactName || client.companyName || client.email,
+      email: session.user.email || client.email,
+      role: session.user.role,
+    },
+  };
 }

@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { solutions } from "@/data/solutions";
 import { ArrowRight, CheckCircle2, Zap, Shield, Settings2 } from "lucide-react";
@@ -49,27 +50,66 @@ export default function SolutionsPage() {
         <div className="absolute bottom-0 left-0 w-[400px] h-[400px] pointer-events-none"
           style={{ background: "radial-gradient(ellipse at bottom left, rgba(59,178,246,0.07) 0%, transparent 65%)" }} />
 
-        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
-          <p className="eyebrow mb-4">Pre-Built Platforms</p>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight tracking-tight mb-5">
-            Deploy in Weeks,
-            <span className="block mt-1" style={{ background: "linear-gradient(135deg, #1ABFAD, #3BB2F6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-              Not Months
-            </span>
-          </h1>
-          <p className="text-base sm:text-lg leading-relaxed max-w-2xl mx-auto mb-8" style={{ color: "rgba(255,255,255,0.65)" }}>
-            Complete platform solutions designed for specific industries and business models — pre-built with best practices, fully customisable to your needs.
-          </p>
-          <Link href="/contact"
-            className="inline-flex items-center gap-2 px-7 py-3.5 rounded-lg text-sm font-semibold text-white transition-all duration-200"
-            style={{ backgroundColor: "#1ABFAD" }}>
-            Request a Demo <ArrowRight className="w-4 h-4" />
-          </Link>
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+            <div className="text-center lg:text-left">
+              <p className="eyebrow mb-4">Pre-Built Platforms</p>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight tracking-tight mb-5">
+                Deploy in Weeks,
+                <span className="block mt-1" style={{ background: "linear-gradient(135deg, #1ABFAD, #3BB2F6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                  Not Months
+                </span>
+              </h1>
+              <p className="text-base sm:text-lg leading-relaxed max-w-2xl mb-8 mx-auto lg:mx-0" style={{ color: "rgba(255,255,255,0.65)" }}>
+                Complete platform solutions designed for specific industries and business models
+                pre-built with best practices and fully customisable to your needs.
+              </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
+                <Link href="/contact"
+                  className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-lg text-sm font-semibold text-white transition-all duration-200"
+                  style={{ backgroundColor: "#1ABFAD" }}>
+                  Request a Demo <ArrowRight className="w-4 h-4" />
+                </Link>
+                <Link href="/services"
+                  className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-lg text-sm font-semibold transition-all duration-200"
+                  style={{ border: "1.5px solid rgba(255,255,255,0.22)", color: "rgba(255,255,255,0.8)" }}>
+                  Explore Services
+                </Link>
+              </div>
+            </div>
+
+            <div>
+              <div className="overflow-hidden rounded-[32px] border border-white/10 bg-white/5 shadow-2xl backdrop-blur">
+                <Image
+                  src="/images/people/solutions-presentation.jpg"
+                  alt="A live team presentation for a business audience"
+                  width={1800}
+                  height={1013}
+                  className="h-[520px] w-full object-cover object-center"
+                />
+              </div>
+              <div className="mt-5 grid gap-4 sm:grid-cols-3">
+                {[
+                  "Ready modules for education, SaaS, and commerce",
+                  "Faster delivery without losing customization",
+                  "Safer launch path with proven architecture",
+                ].map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-2xl border px-4 py-4 text-sm leading-6"
+                    style={{ backgroundColor: "rgba(255,239,225,0.12)", borderColor: "rgba(255,216,181,0.18)", color: "rgba(255,255,255,0.76)" }}
+                  >
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* ── Flagship Solutions ── */}
-      <section className="py-16 sm:py-20 bg-white" style={{ borderBottom: "1px solid #E5E7EB" }}>
+      <section className="py-16 sm:py-20 bg-[linear-gradient(180deg,#FFF8F1_0%,#FFFFFF_100%)]" style={{ borderBottom: "1px solid #EADACB" }}>
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-12">
             <p className="eyebrow mb-3">Flagship Platforms</p>
@@ -83,7 +123,7 @@ export default function SolutionsPage() {
             {/* UEP */}
             {uep && (
               <Link href="/solutions/uep" className="group">
-                <div className="h-full bg-white rounded-xl overflow-hidden transition-all duration-200 hover:shadow-md" style={{ border: "1px solid #E5E7EB" }}>
+                <div className="h-full bg-white rounded-[22px] overflow-hidden transition-all duration-200 hover:shadow-[0_18px_40px_rgba(4,32,66,0.10)]" style={{ border: "1px solid #EADACB" }}>
                   <div className="h-1.5" style={{ background: "linear-gradient(90deg, #1ABFAD, #3BB2F6)" }} />
                   <div className="p-8">
                     <div className="flex items-start gap-4 mb-5">
@@ -130,7 +170,7 @@ export default function SolutionsPage() {
             {/* SaaS Toolkit */}
             {saas && (
               <Link href="/solutions/saas-toolkit" className="group">
-                <div className="h-full bg-white rounded-xl overflow-hidden transition-all duration-200 hover:shadow-md" style={{ border: "1px solid #E5E7EB" }}>
+                <div className="h-full bg-white rounded-[22px] overflow-hidden transition-all duration-200 hover:shadow-[0_18px_40px_rgba(4,32,66,0.10)]" style={{ border: "1px solid #EADACB" }}>
                   <div className="h-1.5" style={{ background: "linear-gradient(90deg, #3BB2F6, #1ABFAD)" }} />
                   <div className="p-8">
                     <div className="flex items-start gap-4 mb-5">
@@ -179,7 +219,7 @@ export default function SolutionsPage() {
 
       {/* ── Other Solutions ── */}
       {others.length > 0 && (
-        <section className="py-16 sm:py-20" style={{ borderBottom: "1px solid #E5E7EB" }}>
+        <section className="py-16 sm:py-20" style={{ borderBottom: "1px solid #EADACB", backgroundColor: "#FFFFFF" }}>
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mb-10">
               <p className="eyebrow mb-3">More Platforms</p>
@@ -190,8 +230,8 @@ export default function SolutionsPage() {
                 const Icon = getIcon(solution.icon);
                 return (
                   <Link key={solution.slug} href={`/solutions/${solution.slug}`} className="group">
-                    <div className="h-full bg-white rounded-xl p-7 transition-all duration-200 hover:shadow-md flex flex-col"
-                      style={{ border: "1px solid #E5E7EB" }}>
+                    <div className="h-full bg-white rounded-[22px] p-7 transition-all duration-200 hover:shadow-[0_18px_40px_rgba(4,32,66,0.10)] flex flex-col"
+                      style={{ border: "1px solid #EADACB" }}>
                       <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-4"
                         style={{ backgroundColor: "rgba(26,191,173,0.1)" }}>
                         <Icon className="w-5 h-5" style={{ color: "#1ABFAD" }} />
@@ -218,7 +258,7 @@ export default function SolutionsPage() {
       )}
 
       {/* ── Why Choose ── */}
-      <section className="py-16 sm:py-20 bg-white" style={{ borderBottom: "1px solid #E5E7EB" }}>
+      <section className="py-16 sm:py-20 bg-[linear-gradient(180deg,#FFF8F1_0%,#FFFFFF_100%)]" style={{ borderBottom: "1px solid #EADACB" }}>
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-12 text-center">
             <p className="eyebrow mb-3">The Doomple Advantage</p>
@@ -228,8 +268,8 @@ export default function SolutionsPage() {
             {whyChoose.map((w) => {
               const Icon = w.icon;
               return (
-                <div key={w.title} className="bg-white rounded-xl p-8 hover:shadow-sm transition-all duration-200"
-                  style={{ border: "1px solid #E5E7EB" }}>
+                <div key={w.title} className="bg-white rounded-[22px] p-8 hover:shadow-[0_18px_40px_rgba(4,32,66,0.08)] transition-all duration-200"
+                  style={{ border: "1px solid #EADACB" }}>
                   <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-5"
                     style={{ backgroundColor: "rgba(26,191,173,0.1)" }}>
                     <Icon className="w-5 h-5" style={{ color: "#1ABFAD" }} />
@@ -244,7 +284,7 @@ export default function SolutionsPage() {
       </section>
 
       {/* ── CTA ── */}
-      <section className="py-20" style={{ backgroundColor: "#042042" }}>
+      <section className="py-20" style={{ background: "linear-gradient(135deg, #042042 0%, #0A2C54 52%, #0D4B68 100%)" }}>
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
           <p className="eyebrow mb-4">Get Started</p>
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">Find the Right Solution for Your Business</h2>

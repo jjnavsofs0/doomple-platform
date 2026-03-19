@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import { Mail, Phone, MapPin, Send, Loader2, CheckCircle2, Clock, Shield } from 'lucide-react';
 
@@ -56,12 +57,42 @@ export default function ContactPage() {
       <section className="relative overflow-hidden py-16 sm:py-20" style={{ backgroundColor: "#042042" }}>
         <div className="absolute top-0 right-0 w-[500px] h-[500px] pointer-events-none"
           style={{ background: "radial-gradient(ellipse at top right, rgba(26,191,173,0.1) 0%, transparent 65%)" }} />
-        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
-          <p className="eyebrow mb-4">Let&apos;s Talk</p>
-          <h1 className="text-4xl sm:text-5xl font-bold text-white mb-4">Get in Touch With Us</h1>
-          <p className="text-base leading-relaxed max-w-xl mx-auto" style={{ color: "rgba(255,255,255,0.65)" }}>
-            Let&apos;s discuss how we can help your business achieve its goals through technology. We respond within 24 hours, Monday to Friday.
-          </p>
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
+            <div className="text-center lg:text-left">
+              <p className="eyebrow mb-4">Let&apos;s Talk</p>
+              <h1 className="text-4xl sm:text-5xl font-bold text-white mb-4">Get in Touch With Us</h1>
+              <p className="text-base leading-relaxed max-w-xl mx-auto lg:mx-0" style={{ color: "rgba(255,255,255,0.65)" }}>
+                Let&apos;s discuss how we can help your business achieve its goals through
+                technology. We respond within 24 hours, Monday to Friday.
+              </p>
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                {[
+                  'Discovery-first conversations',
+                  'Clear response expectations',
+                  'Direct contact with the business team',
+                ].map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-2xl border px-4 py-4 text-sm leading-6"
+                    style={{ backgroundColor: 'rgba(255,239,225,0.12)', borderColor: 'rgba(255,216,181,0.18)', color: 'rgba(255,255,255,0.76)' }}
+                  >
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-[32px] border border-white/10 bg-white/5 shadow-2xl backdrop-blur">
+              <Image
+                src="/images/people/contact-support.jpg"
+                alt="A real support professional speaking with a client"
+                width={1600}
+                height={1067}
+                className="h-[420px] w-full object-cover object-center"
+              />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -72,7 +103,7 @@ export default function ContactPage() {
           {/* Sidebar */}
           <div className="space-y-5">
             {/* Contact person */}
-            <div className="bg-white rounded-xl p-5" style={{ border: "1px solid #E5E7EB" }}>
+            <div className="bg-[#FFF8F1] rounded-[22px] p-5" style={{ border: "1px solid #EADACB" }}>
               <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-widest mb-1">Primary Contact</p>
               <p className="text-sm font-bold text-[#042042]">Sneha Sharma</p>
               <p className="text-xs text-[#6B7280]">Business Development</p>
@@ -82,7 +113,7 @@ export default function ContactPage() {
               { icon: Phone, label: "Phone", value: "+91-9211698507", href: "tel:+919211698507", sub: "Mon – Fri, 9 AM – 6 PM IST" },
               { icon: Mail, label: "Email", value: "sneha@doomple.com", href: "mailto:sneha@doomple.com", sub: "Response within 24 hours" },
             ].map(({ icon: Icon, label, value, href, sub }) => (
-              <a key={label} href={href} className="group flex items-start gap-4 bg-white rounded-xl p-5 transition-all duration-200 hover:shadow-sm" style={{ border: "1px solid #E5E7EB" }}>
+              <a key={label} href={href} className="group flex items-start gap-4 bg-white rounded-[22px] p-5 transition-all duration-200 hover:shadow-[0_16px_36px_rgba(4,32,66,0.08)]" style={{ border: "1px solid #EADACB" }}>
                 <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(26,191,173,0.1)" }}>
                   <Icon className="w-4 h-4" style={{ color: "#1ABFAD" }} />
                 </div>
@@ -94,7 +125,7 @@ export default function ContactPage() {
               </a>
             ))}
 
-            <div className="flex items-start gap-4 bg-white rounded-xl p-5" style={{ border: "1px solid #E5E7EB" }}>
+            <div className="flex items-start gap-4 bg-white rounded-[22px] p-5" style={{ border: "1px solid #EADACB" }}>
               <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: "rgba(26,191,173,0.1)" }}>
                 <MapPin className="w-4 h-4" style={{ color: "#1ABFAD" }} />
               </div>
@@ -109,7 +140,7 @@ export default function ContactPage() {
             </div>
 
             {/* Promises */}
-            <div className="bg-white rounded-xl p-5" style={{ border: "1px solid #E5E7EB" }}>
+            <div className="bg-white rounded-[22px] p-5" style={{ border: "1px solid #EADACB" }}>
               <p className="text-xs font-semibold text-[#042042] mb-3">What to Expect</p>
               {[
                 { icon: Clock,        text: "Response within 24 hours" },
@@ -126,7 +157,7 @@ export default function ContactPage() {
 
           {/* Form */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl p-8 sm:p-10" style={{ border: "1px solid #E5E7EB" }}>
+            <div className="bg-white rounded-[28px] p-8 sm:p-10 shadow-[0_18px_40px_rgba(4,32,66,0.06)]" style={{ border: "1px solid #EADACB" }}>
               <h2 className="text-2xl font-bold text-[#042042] mb-6">Send Us a Message</h2>
 
               {submitStatus === 'success' && (

@@ -1,14 +1,24 @@
 import Razorpay from "razorpay";
 import crypto from "crypto";
 
-if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-  throw new Error("Razorpay API keys are not configured");
+export function isRazorpayConfigured(): boolean {
+  const keyId = process.env.RAZORPAY_KEY_ID || "";
+  const keySecret = process.env.RAZORPAY_KEY_SECRET || "";
+  return Boolean(
+    keyId &&
+    keySecret &&
+    !keyId.includes("REPLACE_ME") &&
+    !keySecret.includes("REPLACE_ME") &&
+    !keySecret.includes("placeholder")
+  );
 }
 
-const razorpayInstance = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// Lazily create instance per call — avoids module-level throw during build
+function getRazorpayInstance(): Razorpay {
+  const keyId = process.env.RAZORPAY_KEY_ID || "";
+  const keySecret = process.env.RAZORPAY_KEY_SECRET || "";
+  return new Razorpay({ key_id: keyId, key_secret: keySecret });
+}
 
 export interface CreateOrderParams {
   amount: number; // in paise (smallest currency unit)
@@ -33,7 +43,8 @@ export interface PaymentLinkParams {
  */
 export async function createOrder(params: CreateOrderParams) {
   try {
-    const order = await razorpayInstance.orders.create({
+    const razorpay = getRazorpayInstance();
+    const order = await razorpay.orders.create({
       amount: params.amount,
       currency: params.currency,
       receipt: params.receipt,
@@ -81,7 +92,8 @@ export function verifyPaymentSignature(
  */
 export async function createPaymentLink(params: PaymentLinkParams) {
   try {
-    const paymentLink = await razorpayInstance.paymentLink.create({
+    const razorpay = getRazorpayInstance();
+    const paymentLink = await razorpay.paymentLink.create({
       amount: params.amount,
       currency: "INR",
       description: params.description,
@@ -107,10 +119,15 @@ export async function createPaymentLink(params: PaymentLinkParams) {
     };
   } catch (error) {
     console.error("Error creating payment link:", error);
+    // Extract Razorpay-specific error description if available
+    const rzpError = error as { error?: { description?: string }; description?: string };
+    const errorMessage =
+      rzpError?.error?.description ||
+      rzpError?.description ||
+      (error instanceof Error ? error.message : "Failed to create payment link");
     return {
       success: false,
-      error:
-        error instanceof Error ? error.message : "Failed to create payment link",
+      error: errorMessage,
     };
   }
 }
@@ -120,7 +137,8 @@ export async function createPaymentLink(params: PaymentLinkParams) {
  */
 export async function getPaymentDetails(paymentId: string) {
   try {
-    const payment = await razorpayInstance.payments.fetch(paymentId);
+    const razorpay = getRazorpayInstance();
+    const payment = await razorpay.payments.fetch(paymentId);
     return {
       success: true,
       data: payment,
@@ -135,4 +153,4 @@ export async function getPaymentDetails(paymentId: string) {
   }
 }
 
-export default razorpayInstance;
+export default getRazorpayInstance();

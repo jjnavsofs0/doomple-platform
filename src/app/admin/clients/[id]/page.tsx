@@ -151,7 +151,7 @@ export default function ClientDetailPage() {
             <p className="text-muted-foreground">Client Details</p>
           </div>
         </div>
-        <Button variant="outline">
+        <Button variant="outline" onClick={() => router.push(`/admin/clients/${clientId}/edit`)}>
           <Edit className="h-4 w-4 mr-2" />
           Edit
         </Button>
@@ -262,7 +262,7 @@ export default function ClientDetailPage() {
             <TabsContent value="projects" className="space-y-4">
               <div className="flex justify-between items-center pt-4">
                 <h3 className="font-semibold">Client Projects</h3>
-                <Button size="sm">
+                <Button size="sm" onClick={() => router.push(`/admin/projects/new?clientId=${clientId}`)}>
                   <Plus className="h-4 w-4 mr-2" />
                   New Project
                 </Button>
@@ -277,6 +277,7 @@ export default function ClientDetailPage() {
                     <div
                       key={project.id}
                       className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
+                      onClick={() => router.push(`/admin/projects/${project.id}`)}
                     >
                       <div className="flex-1">
                         <p className="font-medium">{project.name}</p>
@@ -297,7 +298,7 @@ export default function ClientDetailPage() {
             <TabsContent value="invoices" className="space-y-4">
               <div className="flex justify-between items-center pt-4">
                 <h3 className="font-semibold">Client Invoices</h3>
-                <Button size="sm">
+                <Button size="sm" onClick={() => router.push(`/admin/invoices/new?clientId=${clientId}`)}>
                   <Plus className="h-4 w-4 mr-2" />
                   New Invoice
                 </Button>
@@ -312,6 +313,7 @@ export default function ClientDetailPage() {
                     <div
                       key={invoice.id}
                       className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 cursor-pointer transition-colors"
+                      onClick={() => router.push(`/admin/invoices/${invoice.id}`)}
                     >
                       <div className="flex-1">
                         <p className="font-medium">{invoice.invoiceNumber}</p>

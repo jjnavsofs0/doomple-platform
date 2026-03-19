@@ -29,17 +29,22 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
 
-  const navItems = [
-    { label: "Dashboard",   href: "/admin/dashboard",   icon: LayoutDashboard },
-    { label: "CRM (Leads)", href: "/admin/leads",        icon: Users },
-    { label: "Clients",     href: "/admin/clients",      icon: Building2 },
-    { label: "Projects",    href: "/admin/projects",     icon: Briefcase },
-    { label: "Quotations",  href: "/admin/quotations",   icon: FileText },
-    { label: "Invoices",    href: "/admin/invoices",     icon: Receipt },
-    { label: "Payments",    href: "/admin/payments",     icon: CreditCard },
-    { label: "Users",       href: "/admin/users",        icon: Users },
-    { label: "Settings",    href: "/admin/settings",     icon: Settings },
+  const role = (session?.user as { role?: string })?.role || "";
+
+  const allNavItems = [
+    { label: "Dashboard",   href: "/admin/dashboard",   icon: LayoutDashboard, roles: ["SUPER_ADMIN","ADMIN","SALES","PROJECT_MANAGER","FINANCE"] },
+    { label: "CRM (Leads)", href: "/admin/leads",        icon: Users,           roles: ["SUPER_ADMIN","ADMIN","SALES"] },
+    { label: "Clients",     href: "/admin/clients",      icon: Building2,       roles: ["SUPER_ADMIN","ADMIN","SALES","PROJECT_MANAGER","FINANCE"] },
+    { label: "Projects",    href: "/admin/projects",     icon: Briefcase,       roles: ["SUPER_ADMIN","ADMIN","PROJECT_MANAGER","SALES"] },
+    { label: "Quotations",  href: "/admin/quotations",   icon: FileText,        roles: ["SUPER_ADMIN","ADMIN","SALES","FINANCE"] },
+    { label: "Invoices",    href: "/admin/invoices",     icon: Receipt,         roles: ["SUPER_ADMIN","ADMIN","FINANCE","PROJECT_MANAGER"] },
+    { label: "Payments",    href: "/admin/payments",     icon: CreditCard,      roles: ["SUPER_ADMIN","ADMIN","FINANCE"] },
+    { label: "Users",       href: "/admin/users",        icon: Users,           roles: ["SUPER_ADMIN"] },
+    { label: "Settings",    href: "/admin/settings",     icon: Settings,        roles: ["SUPER_ADMIN","ADMIN"] },
   ];
+
+  // Filter nav items to only show what the current role can access
+  const navItems = role ? allNavItems.filter((item) => item.roles.includes(role)) : allNavItems;
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");

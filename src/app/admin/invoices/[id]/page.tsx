@@ -147,8 +147,8 @@ export default function InvoiceDetailPage() {
         }),
       })
 
-      if (!response.ok) throw new Error("Failed to generate payment link")
       const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "Failed to generate payment link")
       setPaymentLink(result.data?.shortUrl || null)
       setSuccess("Payment link generated successfully")
     } catch (err) {

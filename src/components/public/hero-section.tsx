@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, TrendingUp, Clock, Users, Code } from "lucide-react";
+import { ArrowRight, CheckCircle2, TrendingUp, Users, Code } from "lucide-react";
 
 export function HeroSection() {
   const stats = [
@@ -9,13 +10,6 @@ export function HeroSection() {
     { value: "50+", label: "Clients Globally" },
     { value: "8+", label: "Industry Verticals" },
     { value: "< 24 hrs", label: "Response Guarantee" },
-  ];
-
-  // Simulated active projects for the dashboard mockup
-  const mockProjects = [
-    { name: "E-Commerce Platform", progress: 82, color: "#1ABFAD" },
-    { name: "EdTech SaaS Backend", progress: 100, color: "#3BB2F6" },
-    { name: "AI Analytics Suite", progress: 55, color: "#1ABFAD" },
   ];
 
   const recentDeliveries = [
@@ -81,10 +75,29 @@ export function HeroSection() {
               </span>
             </h1>
 
-            {/* Subheadline — short */}
             <p className="text-base sm:text-lg leading-relaxed mb-8" style={{ color: "rgba(255,255,255,0.6)" }}>
-              We build custom software, deploy AI, and provide expert technology consulting — helping startups, MSMEs and enterprises move faster with less risk.
+              We build custom software, deploy AI, and provide expert technology consulting helping
+              startups, MSMEs and enterprises move faster with less risk and more clarity.
             </p>
+
+            <div className="mb-8 grid gap-3 sm:grid-cols-2">
+              {[
+                "Strategy, software, and execution handled in one senior-led team.",
+                "A more collaborative delivery model built for real business pressure.",
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="rounded-2xl px-4 py-4 text-sm leading-6"
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.07)",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    color: "rgba(255,255,255,0.76)",
+                  }}
+                >
+                  {item}
+                </div>
+              ))}
+            </div>
 
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row gap-3 mb-10">
@@ -133,101 +146,60 @@ export function HeroSection() {
             </div>
           </div>
 
-          {/* ─── Right: Dashboard Mockup ─── */}
+          {/* ─── Right: Team Illustration + Evidence ─── */}
           <div className="hidden lg:block">
-            <div
-              className="rounded-2xl overflow-hidden"
-              style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}
-            >
-              {/* Window chrome */}
+            <div className="relative">
               <div
-                className="flex items-center gap-2 px-4 py-3"
-                style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", backgroundColor: "rgba(255,255,255,0.03)" }}
+                className="overflow-hidden rounded-[30px]"
+                style={{ backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}
               >
-                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.2)" }} />
-                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: "rgba(255,255,255,0.2)" }} />
-                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: "#1ABFAD", opacity: 0.8 }} />
-                <span className="ml-3 text-xs font-mono" style={{ color: "rgba(255,255,255,0.3)" }}>
-                  doomple.com/dashboard
-                </span>
+                <Image
+                  src="/images/people/home-hero.jpg"
+                  alt="A real team standing together in a modern office"
+                  width={1800}
+                  height={1013}
+                  className="h-[520px] w-full object-cover object-center"
+                />
               </div>
 
-              <div className="p-6">
-                {/* Header row */}
-                <div className="flex items-center justify-between mb-5">
-                  <div>
-                    <p className="text-white font-semibold text-sm">Project Overview</p>
-                    <p className="text-xs mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>Q1 2025 · 12 active engagements</p>
-                  </div>
-                  <div
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
-                    style={{ backgroundColor: "rgba(26,191,173,0.15)", color: "#1ABFAD" }}
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "#1ABFAD" }} />
-                    On Track
-                  </div>
-                </div>
+              <div className="absolute -left-8 top-8 rounded-3xl bg-[#FFF5EB] px-5 py-4 shadow-[0_18px_50px_rgba(4,32,66,0.18)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#E17A44]">
+                  Human-Led
+                </p>
+                <p className="mt-2 text-sm font-semibold text-[#042042]">
+                  Strategy and execution stay close together.
+                </p>
+              </div>
 
-                {/* Metric tiles */}
-                <div className="grid grid-cols-3 gap-2.5 mb-5">
+              <div className="absolute -right-8 bottom-10 w-64 rounded-3xl bg-[#F8FBFF] p-5 shadow-[0_18px_50px_rgba(4,32,66,0.18)]">
+                <div className="mb-4 grid grid-cols-3 gap-2.5">
                   {[
-                    { icon: TrendingUp, value: "94%", label: "On-time rate", color: "#1ABFAD" },
-                    { icon: Users, value: "50+", label: "Active clients", color: "#3BB2F6" },
+                    { icon: TrendingUp, value: "94%", label: "On-time", color: "#1ABFAD" },
+                    { icon: Users, value: "50+", label: "Clients", color: "#3BB2F6" },
                     { icon: Code, value: "100+", label: "Shipped", color: "#1ABFAD" },
                   ].map((tile) => {
                     const TileIcon = tile.icon;
                     return (
-                      <div
-                        key={tile.label}
-                        className="rounded-xl p-3 text-center"
-                        style={{ backgroundColor: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)" }}
-                      >
-                        <TileIcon className="w-4 h-4 mx-auto mb-1.5" style={{ color: tile.color }} />
-                        <p className="text-lg font-bold text-white leading-none mb-0.5">{tile.value}</p>
-                        <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.35)" }}>{tile.label}</p>
+                      <div key={tile.label} className="rounded-2xl bg-[#ECF6FF] px-3 py-3 text-center">
+                        <TileIcon className="mx-auto mb-1.5 h-4 w-4" style={{ color: tile.color }} />
+                        <p className="text-sm font-bold text-[#042042]">{tile.value}</p>
+                        <p className="text-[10px] text-[#6B7280]">{tile.label}</p>
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Active projects */}
-                <div className="mb-5">
-                  <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "rgba(255,255,255,0.3)" }}>
-                    Active Projects
-                  </p>
-                  <div className="space-y-3">
-                    {mockProjects.map((project) => (
-                      <div key={project.name}>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-xs font-medium text-white/80">{project.name}</span>
-                          <span className="text-xs font-semibold" style={{ color: project.color }}>{project.progress}%</span>
-                        </div>
-                        <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{ width: `${project.progress}%`, backgroundColor: project.color, opacity: 0.8 }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Recent deliveries */}
-                <div
-                  className="rounded-xl p-4"
-                  style={{ backgroundColor: "rgba(26,191,173,0.06)", border: "1px solid rgba(26,191,173,0.12)" }}
-                >
-                  <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "rgba(26,191,173,0.7)" }}>
+                <div className="rounded-2xl p-4" style={{ backgroundColor: "#042042" }}>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-[#7CE6DA]">
                     Recent Deliveries
                   </p>
                   <div className="space-y-2.5">
                     {recentDeliveries.map((item) => (
                       <div key={item.label} className="flex items-center gap-2.5">
-                        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: "#1ABFAD" }} />
+                        <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#1ABFAD" }} />
                         <div>
-                          <span className="text-xs font-medium text-white/80">{item.label}</span>
-                          <span className="text-xs ml-2" style={{ color: "rgba(255,255,255,0.35)" }}>— {item.note}</span>
+                          <span className="text-xs font-medium text-white/85">{item.label}</span>
+                          <span className="ml-2 text-xs text-white/40">{item.note}</span>
                         </div>
                       </div>
                     ))}

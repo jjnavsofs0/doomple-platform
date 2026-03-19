@@ -27,6 +27,56 @@ export async function PATCH(
       );
     }
 
+    // === SUPER ADMIN PROTECTION ===
+
+    // Only SUPER_ADMIN can modify another SUPER_ADMIN
+    if (
+      existingUser.role === "SUPER_ADMIN" &&
+      auth.session.user.role !== "SUPER_ADMIN"
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Only a Super Admin can modify another Super Admin account" },
+        { status: 403 }
+      );
+    }
+
+    // Prevent deactivating own account
+    if (
+      body.isActive === false &&
+      params.id === auth.session.user.id
+    ) {
+      return NextResponse.json(
+        { success: false, error: "You cannot deactivate your own account" },
+        { status: 400 }
+      );
+    }
+
+    // Prevent deactivating the last SUPER_ADMIN
+    if (body.isActive === false && existingUser.role === "SUPER_ADMIN") {
+      const superAdminCount = await prisma.user.count({
+        where: { role: "SUPER_ADMIN", isActive: true },
+      });
+      if (superAdminCount <= 1) {
+        return NextResponse.json(
+          { success: false, error: "Cannot deactivate the last active Super Admin account" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Prevent promoting to SUPER_ADMIN unless requester is SUPER_ADMIN
+    if (
+      body.role === "SUPER_ADMIN" &&
+      auth.session.user.role !== "SUPER_ADMIN"
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Only a Super Admin can promote users to Super Admin" },
+        { status: 403 }
+      );
+    }
+
+    // ==============================
+
     if (body.email && body.email !== existingUser.email) {
       const duplicate = await prisma.user.findUnique({
         where: { email: body.email },
@@ -104,11 +154,7 @@ export async function DELETE(
 
     const user = await prisma.user.findUnique({
       where: { id: params.id },
-      select: {
-        id: true,
-        role: true,
-        email: true,
-      },
+      select: { id: true, role: true, email: true },
     });
 
     if (!user) {
@@ -118,18 +164,38 @@ export async function DELETE(
       );
     }
 
-    if (user.role === "SUPER_ADMIN" && user.id === auth.session.user.id) {
+    // Prevent deactivating own account
+    if (user.id === auth.session.user.id) {
       return NextResponse.json(
-        { success: false, error: "You cannot deactivate your own super admin account" },
+        { success: false, error: "You cannot deactivate your own account" },
         { status: 400 }
       );
     }
 
+    // Only SUPER_ADMIN can deactivate other SUPER_ADMIN accounts
+    if (user.role === "SUPER_ADMIN" && auth.session.user.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { success: false, error: "Only a Super Admin can deactivate another Super Admin account" },
+        { status: 403 }
+      );
+    }
+
+    // Prevent deactivating the last active SUPER_ADMIN
+    if (user.role === "SUPER_ADMIN") {
+      const superAdminCount = await prisma.user.count({
+        where: { role: "SUPER_ADMIN", isActive: true },
+      });
+      if (superAdminCount <= 1) {
+        return NextResponse.json(
+          { success: false, error: "Cannot deactivate the last active Super Admin account" },
+          { status: 400 }
+        );
+      }
+    }
+
     await prisma.user.update({
       where: { id: params.id },
-      data: {
-        isActive: false,
-      },
+      data: { isActive: false },
     });
 
     return NextResponse.json({

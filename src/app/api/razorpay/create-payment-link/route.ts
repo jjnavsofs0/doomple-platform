@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { createPaymentLink } from "@/lib/razorpay";
+import { createPaymentLink, isRazorpayConfigured } from "@/lib/razorpay";
 import { getOutstandingAmount } from "@/lib/invoice-payments";
 import { canAccessInvoiceForPayment } from "@/lib/invoice-access";
 
@@ -11,6 +11,14 @@ export async function POST(request: Request) {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Check Razorpay keys are properly configured
+    if (!isRazorpayConfigured()) {
+      return NextResponse.json(
+        { success: false, error: "Razorpay is not configured. Please add your live API keys (RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET) in your environment settings." },
+        { status: 503 }
+      );
     }
 
     const body = await request.json();

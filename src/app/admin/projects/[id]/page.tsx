@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Edit, Plus } from "lucide-react"
+import { ArrowLeft, Edit, Plus, X } from "lucide-react"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -70,6 +70,12 @@ export default function ProjectDetailPage() {
   const [activeTab, setActiveTab] = React.useState("overview")
   const [newNote, setNewNote] = React.useState("")
   const [isClientVisible, setIsClientVisible] = React.useState(false)
+  const [showStatusModal, setShowStatusModal] = React.useState(false)
+  const [showProgressModal, setShowProgressModal] = React.useState(false)
+  const [selectedStatus, setSelectedStatus] = React.useState("")
+  const [selectedProgress, setSelectedProgress] = React.useState(0)
+  const [statusReason, setStatusReason] = React.useState("")
+  const [isUpdating, setIsUpdating] = React.useState(false)
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -135,6 +141,49 @@ export default function ProjectDetailPage() {
     }
   }
 
+  const handleUpdateStatus = async () => {
+    if (!project || !selectedStatus) return
+    try {
+      setIsUpdating(true)
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: selectedStatus, statusReason }),
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setProject(data.data || data)
+        setShowStatusModal(false)
+        setStatusReason("")
+      }
+    } catch (err) {
+      console.error("Failed to update status", err)
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const handleUpdateProgress = async () => {
+    if (!project) return
+    try {
+      setIsUpdating(true)
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ progressPercent: selectedProgress }),
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setProject(data.data || data)
+        setShowProgressModal(false)
+      }
+    } catch (err) {
+      console.error("Failed to update progress", err)
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-6 p-6 max-w-7xl mx-auto">
@@ -180,7 +229,7 @@ export default function ProjectDetailPage() {
         </div>
         <div className="flex items-center gap-2">
           <StatusBadge status={project.status} />
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => router.push(`/admin/projects/${projectId}/edit`)}>
             <Edit className="h-4 w-4 mr-2" />
             Edit
           </Button>
@@ -552,10 +601,103 @@ export default function ProjectDetailPage() {
       </Card>
 
       <div className="flex gap-2">
-        <Button>Update Status</Button>
-        <Button variant="outline">Update Progress</Button>
-        <Button variant="outline">Create Invoice</Button>
+        <Button onClick={() => { setSelectedStatus(project.status); setShowStatusModal(true) }}>
+          Update Status
+        </Button>
+        <Button variant="outline" onClick={() => { setSelectedProgress(project.progress); setShowProgressModal(true) }}>
+          Update Progress
+        </Button>
+        <Button variant="outline" onClick={() => router.push(`/admin/invoices/new?projectId=${projectId}`)}>
+          Create Invoice
+        </Button>
       </div>
+
+      {/* Update Status Modal */}
+      {showStatusModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold" style={{ color: "#042042" }}>Update Project Status</h3>
+              <button onClick={() => setShowStatusModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1" style={{ color: "#374151" }}>New Status</label>
+                <select
+                  value={selectedStatus}
+                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1ABFAD]"
+                >
+                  <option value="DRAFT">Draft</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="ON_HOLD">On Hold</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="CANCELLED">Cancelled</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1" style={{ color: "#374151" }}>Reason (optional)</label>
+                <textarea
+                  value={statusReason}
+                  onChange={(e) => setStatusReason(e.target.value)}
+                  placeholder="Reason for status change..."
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm h-20 resize-none focus:outline-none focus:ring-2 focus:ring-[#1ABFAD]"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button onClick={handleUpdateStatus} disabled={isUpdating}>
+                  {isUpdating ? "Updating..." : "Update Status"}
+                </Button>
+                <Button variant="outline" onClick={() => setShowStatusModal(false)}>Cancel</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Update Progress Modal */}
+      {showProgressModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold" style={{ color: "#042042" }}>Update Project Progress</h3>
+              <button onClick={() => setShowProgressModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium" style={{ color: "#374151" }}>Progress</label>
+                  <span className="text-lg font-bold" style={{ color: "#1ABFAD" }}>{selectedProgress}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={selectedProgress}
+                  onChange={(e) => setSelectedProgress(Number(e.target.value))}
+                  className="w-full accent-[#1ABFAD]"
+                />
+                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                  <span>0%</span>
+                  <span>50%</span>
+                  <span>100%</span>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button onClick={handleUpdateProgress} disabled={isUpdating}>
+                  {isUpdating ? "Updating..." : "Save Progress"}
+                </Button>
+                <Button variant="outline" onClick={() => setShowProgressModal(false)}>Cancel</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
