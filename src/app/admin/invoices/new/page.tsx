@@ -127,7 +127,7 @@ function NewInvoiceContent() {
       const projectList = (projectsData.data || []).map((project: any) => ({
         id: project.id,
         name: project.name,
-        clientId: project.clientId,
+        clientId: project.clientId || "",
         currency: project.currency || "INR",
       }))
       setAllProjects(projectList)
@@ -136,6 +136,17 @@ function NewInvoiceContent() {
         setProjects(projectList.filter((p: any) => p.clientId === preselectedClientId))
       } else {
         setProjects(projectList)
+      }
+      // Explicitly re-apply preselected project after data loads (prevents stale-closure clearing)
+      if (preselectedProjectId) {
+        const found = projectList.find((p: any) => p.id === preselectedProjectId)
+        if (found) {
+          setProjectId(preselectedProjectId)
+          // Also auto-set client if not already provided via URL
+          if (!preselectedClientId && found.clientId) {
+            setClientId(found.clientId)
+          }
+        }
       }
 
       if (quotationsRes.ok) {

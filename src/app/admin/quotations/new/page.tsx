@@ -41,6 +41,7 @@ function NewQuotationContent() {
   const searchParams = useSearchParams()
   const preselectedClientId = searchParams.get("clientId") || ""
   const preselectedLeadId = searchParams.get("leadId") || ""
+  const preselectedProjectId = searchParams.get("projectId") || ""
 
   const [clients, setClients] = useState<Client[]>([])
   const [leads, setLeads] = useState<Lead[]>([])
@@ -97,6 +98,22 @@ function NewQuotationContent() {
           name: lead.fullName,
         }))
       )
+
+      // If projectId is in URL, fetch that project to auto-select its client
+      if (preselectedProjectId && !preselectedClientId) {
+        try {
+          const projRes = await fetch(`/api/projects/${preselectedProjectId}`)
+          if (projRes.ok) {
+            const projData = await projRes.json()
+            const proj = projData.data || projData
+            if (proj?.clientId) {
+              setClientId(proj.clientId)
+            }
+          }
+        } catch {
+          // Non-fatal — client just won't be auto-selected
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data")
     } finally {

@@ -27,22 +27,28 @@ export async function POST(request: Request) {
     const ipAddress = forwardedFor?.split(",")[0]?.trim() || null;
     const userAgent = headerStore.get("user-agent");
 
-    await prisma.cookieConsentRecord.create({
-      data: {
-        visitorId,
-        userId: session?.user?.id || null,
-        policyVersion: COOKIE_POLICY_VERSION,
-        decision,
-        source: String(body.source || "banner"),
-        preferences: {
-          essential: true,
-          analytics: decision === "ACCEPT_ALL",
-          marketing: decision === "ACCEPT_ALL",
+    // Try to persist consent to DB, but don't fail if table doesn't exist yet
+    try {
+      await prisma.cookieConsentRecord.create({
+        data: {
+          visitorId,
+          userId: session?.user?.id || null,
+          policyVersion: COOKIE_POLICY_VERSION,
+          decision,
+          source: String(body.source || "banner"),
+          preferences: {
+            essential: true,
+            analytics: decision === "ACCEPT_ALL",
+            marketing: decision === "ACCEPT_ALL",
+          },
+          ipAddress,
+          userAgent,
         },
-        ipAddress,
-        userAgent,
-      },
-    });
+      });
+    } catch (dbErr) {
+      // Non-fatal: cookies will still be set even if DB write fails
+      console.warn("Cookie consent DB write skipped (migration pending?):", (dbErr as Error).message);
+    }
 
     const response = NextResponse.json({
       success: true,

@@ -5,6 +5,7 @@ import { getStorageIntegrationStatus, isS3Configured } from "@/lib/storage";
 import { getSesIntegrationStatus, isSesConfigured } from "@/lib/email";
 import { SUPPORTED_CURRENCIES, normalizeCurrency } from "@/lib/billing";
 import { getPusherIntegrationStatus } from "@/lib/pusher-server";
+import { isRazorpayConfigured } from "@/lib/razorpay";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +72,10 @@ export async function GET() {
         realtimeAppIdConfigured: pusher.appIdConfigured,
         realtimeKeyConfigured: pusher.keyConfigured,
         realtimeSecretConfigured: pusher.secretConfigured,
+        razorpayConfigured: isRazorpayConfigured(),
+        razorpayKeyIdSet: Boolean(process.env.RAZORPAY_KEY_ID && !process.env.RAZORPAY_KEY_ID.includes("REPLACE_ME")),
+        razorpaySecretSet: Boolean(process.env.RAZORPAY_KEY_SECRET && !process.env.RAZORPAY_KEY_SECRET.includes("REPLACE_ME")),
+        razorpayWebhookSet: Boolean(process.env.RAZORPAY_WEBHOOK_SECRET && process.env.RAZORPAY_WEBHOOK_SECRET.length > 0),
       },
     });
   } catch (error) {

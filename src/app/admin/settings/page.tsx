@@ -67,6 +67,10 @@ type Integrations = {
   realtimeAppIdConfigured?: boolean;
   realtimeKeyConfigured?: boolean;
   realtimeSecretConfigured?: boolean;
+  razorpayConfigured?: boolean;
+  razorpayKeyIdSet?: boolean;
+  razorpaySecretSet?: boolean;
+  razorpayWebhookSet?: boolean;
 };
 
 const emptySettings: SettingsState = {
@@ -505,6 +509,14 @@ export default function SettingsPage() {
                     ? `Pusher cluster: ${integrations.realtimeCluster}`
                     : "Pusher is not fully configured yet",
                   secondary: `App ID: ${integrations?.realtimeAppIdConfigured ? "set" : "missing"} · Key: ${integrations?.realtimeKeyConfigured ? "set" : "missing"} · Secret: ${integrations?.realtimeSecretConfigured ? "set" : "missing"}`,
+                },
+                {
+                  label: "Razorpay Payments",
+                  configured: integrations?.razorpayConfigured,
+                  primary: integrations?.razorpayConfigured
+                    ? "Razorpay is active and ready to accept payments"
+                    : "Razorpay credentials not configured",
+                  secondary: `Key ID: ${integrations?.razorpayKeyIdSet ? "set" : "missing"} · Secret: ${integrations?.razorpaySecretSet ? "set" : "missing"} · Webhook: ${integrations?.razorpayWebhookSet ? "set" : "missing"}`,
                 },
               ].map((item) => (
                 <div

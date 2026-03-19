@@ -445,6 +445,16 @@ export default function ProjectDetailPage() {
               <Button
                 variant="outline"
                 onClick={() =>
+                  router.push(`/admin/quotations/new?projectId=${projectId}&clientId=${project.clientId}`)
+                }
+                className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Create Quotation
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() =>
                   router.push(`/admin/invoices/new?projectId=${projectId}&clientId=${project.clientId}`)
                 }
                 className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
