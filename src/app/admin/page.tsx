@@ -255,9 +255,9 @@ export default function AdminDashboard() {
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle>Recent Leads</CardTitle>
             <Link href="/admin/leads">
-              <Button variant="ghost" size="sm">
-                View All
-              </Button>
+              <span className="text-xs font-medium hover:underline" style={{ color: "#1ABFAD" }}>
+                View All →
+              </span>
             </Link>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -288,9 +288,9 @@ export default function AdminDashboard() {
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle>Recent Projects</CardTitle>
             <Link href="/admin/projects">
-              <Button variant="ghost" size="sm">
-                View All
-              </Button>
+              <span className="text-xs font-medium hover:underline" style={{ color: "#1ABFAD" }}>
+                View All →
+              </span>
             </Link>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -304,7 +304,8 @@ export default function AdminDashboard() {
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-green-500 rounded-full"
+                      className="h-full rounded-full"
+                      style={{ backgroundColor: "#1ABFAD" }}
                       style={{ width: `${project.progress}%` }}
                     />
                   </div>
@@ -332,7 +333,8 @@ export default function AdminDashboard() {
                 </div>
                 <div className="h-2 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-blue-500 rounded-full"
+                    className="h-full rounded-full"
+                    style={{ backgroundColor: "#1ABFAD" }}
                     style={{ width: `${Math.min((count / 15) * 100, 100)}%` }}
                   />
                 </div>
@@ -358,7 +360,8 @@ export default function AdminDashboard() {
                   </div>
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-purple-500 rounded-full"
+                      className="h-full rounded-full"
+                      style={{ backgroundColor: "#3BB2F6" }}
                       style={{ width: `${percentage}%` }}
                     />
                   </div>
@@ -374,30 +377,36 @@ export default function AdminDashboard() {
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <Link href="/admin/leads/new" className="block">
-              <Button className="w-full justify-start" variant="outline">
-                <Plus className="mr-2 h-4 w-4" />
-                New Lead
-              </Button>
-            </Link>
-            <Link href="/admin/clients" className="block">
-              <Button className="w-full justify-start" variant="outline">
-                <Plus className="mr-2 h-4 w-4" />
-                New Client
-              </Button>
-            </Link>
-            <Link href="/admin/projects" className="block">
-              <Button className="w-full justify-start" variant="outline">
-                <Plus className="mr-2 h-4 w-4" />
-                New Project
-              </Button>
-            </Link>
-            <Link href="/admin/invoices" className="block">
-              <Button className="w-full justify-start" variant="outline">
-                <Plus className="mr-2 h-4 w-4" />
-                New Invoice
-              </Button>
-            </Link>
+            {[
+              { href: "/admin/leads/new",   label: "New Lead" },
+              { href: "/admin/clients/new", label: "New Client" },
+              { href: "/admin/projects/new",label: "New Project" },
+              { href: "/admin/invoices/new",label: "New Invoice" },
+            ].map(({ href, label }) => (
+              <Link key={href} href={href} className="block">
+                <button
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 border hover:shadow-sm"
+                  style={{
+                    border: "1px solid #E5E7EB",
+                    color: "#042042",
+                    backgroundColor: "#FFFFFF",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = "#1ABFAD";
+                    (e.currentTarget as HTMLButtonElement).style.color = "#1ABFAD";
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = "rgba(26,191,173,0.04)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = "#E5E7EB";
+                    (e.currentTarget as HTMLButtonElement).style.color = "#042042";
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = "#FFFFFF";
+                  }}
+                >
+                  <Plus className="h-4 w-4 flex-shrink-0" />
+                  {label}
+                </button>
+              </Link>
+            ))}
           </CardContent>
         </Card>
       </div>
