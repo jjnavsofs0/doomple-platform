@@ -5,6 +5,7 @@ const globalForErrorLogging = globalThis as typeof globalThis & {
   __doompleServerErrorLoggingActive?: boolean;
   __doompleUnhandledRejectionListener?: (reason: unknown) => void;
   __doompleUncaughtExceptionListener?: (error: Error) => void;
+  __doompleProcessWarningListener?: (warning: Error & { code?: string; name?: string }) => void;
 };
 
 function normalizeValue(value: unknown) {
@@ -27,7 +28,7 @@ async function logServerError(params: {
   title: string;
   message: string;
   stack?: string | null;
-  severity?: "ERROR" | "CRITICAL";
+  severity?: "INFO" | "WARNING" | "ERROR" | "CRITICAL";
   area?: string;
   metadata?: Record<string, unknown>;
 }) {
@@ -54,6 +55,15 @@ async function logServerError(params: {
   }
 }
 
+function isNodeDeprecationWarningMessage(value: unknown) {
+  const text = normalizeValue(value);
+  return (
+    text.includes("DeprecationWarning") ||
+    text.includes("[DEP0169]") ||
+    text.includes("`url.parse()` behavior is not standardized")
+  );
+}
+
 function registerServerErrorLogging() {
   if (
     typeof window !== "undefined" ||
@@ -66,6 +76,10 @@ function registerServerErrorLogging() {
 
   console.error = (...args: unknown[]) => {
     originalConsoleError(...args);
+
+    if (args.some((arg) => isNodeDeprecationWarningMessage(arg))) {
+      return;
+    }
 
     const titleCandidate = typeof args[0] === "string" ? args[0] : "Server console error";
     const errorArg = args.find((arg) => arg instanceof Error) as Error | undefined;
@@ -108,11 +122,31 @@ function registerServerErrorLogging() {
     });
   };
 
+  const processWarningListener = (warning: Error & { code?: string; name?: string }) => {
+    if (!isNodeDeprecationWarningMessage(warning.message) && warning.name !== "DeprecationWarning") {
+      return;
+    }
+
+    void logServerError({
+      title: `${warning.name || "Process warning"}${warning.code ? ` (${warning.code})` : ""}`,
+      message: warning.message,
+      stack: warning.stack || null,
+      severity: "INFO",
+      area: "process.warning",
+      metadata: {
+        code: warning.code || null,
+        name: warning.name || null,
+      },
+    });
+  };
+
   globalForErrorLogging.__doompleUnhandledRejectionListener = unhandledRejectionListener;
   globalForErrorLogging.__doompleUncaughtExceptionListener = uncaughtExceptionListener;
+  globalForErrorLogging.__doompleProcessWarningListener = processWarningListener;
 
   process.on("unhandledRejection", unhandledRejectionListener);
   process.on("uncaughtException", uncaughtExceptionListener);
+  process.on("warning", processWarningListener);
 
   globalForErrorLogging.__doompleServerErrorLoggingRegistered = true;
 }

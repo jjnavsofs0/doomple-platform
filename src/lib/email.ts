@@ -1,33 +1,56 @@
 import { SendEmailCommand, SendRawEmailCommand, SESClient } from "@aws-sdk/client-ses";
 
-function getSesClient() {
-  const region = process.env.AWS_SES_REGION || process.env.AWS_REGION;
+function readEnvValue(name: string) {
+  const value = process.env[name];
+  if (!value) {
+    return "";
+  }
 
-  if (!region || !process.env.AWS_SES_FROM_EMAIL) {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+
+  return trimmed;
+}
+
+function getSesClient() {
+  const region = readEnvValue("AWS_SES_REGION") || readEnvValue("AWS_REGION");
+  const fromEmail = readEnvValue("AWS_SES_FROM_EMAIL");
+
+  if (!region || !fromEmail) {
     return null;
   }
+
+  const sesAccessKeyId = readEnvValue("AWS_SES_ACCESS_KEY_ID");
+  const sesSecretAccessKey = readEnvValue("AWS_SES_SECRET_ACCESS_KEY");
+  const awsAccessKeyId = readEnvValue("AWS_ACCESS_KEY_ID");
+  const awsSecretAccessKey = readEnvValue("AWS_SECRET_ACCESS_KEY");
 
   return new SESClient({
     region,
     credentials:
-      process.env.AWS_SES_ACCESS_KEY_ID && process.env.AWS_SES_SECRET_ACCESS_KEY
+      sesAccessKeyId && sesSecretAccessKey
         ? {
-            accessKeyId: process.env.AWS_SES_ACCESS_KEY_ID,
-            secretAccessKey: process.env.AWS_SES_SECRET_ACCESS_KEY,
+            accessKeyId: sesAccessKeyId,
+            secretAccessKey: sesSecretAccessKey,
           }
-        : process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+        : awsAccessKeyId && awsSecretAccessKey
         ? {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+            accessKeyId: awsAccessKeyId,
+            secretAccessKey: awsSecretAccessKey,
           }
         : undefined,
   });
 }
 
 export function getSesIntegrationStatus() {
-  const region = process.env.AWS_SES_REGION || process.env.AWS_REGION || "";
-  const fromEmail = process.env.AWS_SES_FROM_EMAIL || "";
-  const replyToEmail = process.env.AWS_SES_REPLY_TO || "";
+  const region = readEnvValue("AWS_SES_REGION") || readEnvValue("AWS_REGION") || "";
+  const fromEmail = readEnvValue("AWS_SES_FROM_EMAIL");
+  const replyToEmail = readEnvValue("AWS_SES_REPLY_TO");
 
   return {
     region,
@@ -49,7 +72,7 @@ export async function sendTransactionalEmail(params: {
   replyTo?: string;
 }) {
   const sesClient = getSesClient();
-  const fromEmail = process.env.AWS_SES_FROM_EMAIL;
+  const fromEmail = readEnvValue("AWS_SES_FROM_EMAIL");
 
   if (!sesClient || !fromEmail) {
     throw new Error(
@@ -101,7 +124,7 @@ export async function sendEmailWithAttachment(params: {
   };
 }) {
   const sesClient = getSesClient();
-  const fromEmail = process.env.AWS_SES_FROM_EMAIL;
+  const fromEmail = readEnvValue("AWS_SES_FROM_EMAIL");
 
   if (!sesClient || !fromEmail) {
     throw new Error(
