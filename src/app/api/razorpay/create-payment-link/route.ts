@@ -3,7 +3,13 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { isGatewaySupportedForCurrency, normalizeCurrency } from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
-import { createPaymentLink, isRazorpayConfigured } from "@/lib/razorpay";
+import {
+  buildRazorpayAmountLimitMessage,
+  createPaymentLink,
+  getRazorpayTransactionLimit,
+  isRazorpayAmountLimitError,
+  isRazorpayConfigured,
+} from "@/lib/razorpay";
 import { getOutstandingAmount } from "@/lib/invoice-payments";
 import { canAccessInvoiceForPayment } from "@/lib/invoice-access";
 import { getErrorMessage, getErrorStack, recordAppError } from "@/lib/app-error-log";
@@ -97,6 +103,38 @@ export async function POST(request: Request) {
       normalizedPhone.length >= 8 && normalizedPhone.length <= 14
         ? normalizedPhone
         : undefined;
+    const configuredLimit = getRazorpayTransactionLimit(invoiceCurrency);
+
+    if (configuredLimit !== null && outstandingAmount > configuredLimit) {
+      const limitErrorMessage = buildRazorpayAmountLimitMessage({
+        currency: invoiceCurrency,
+        amount: outstandingAmount,
+        configuredLimit,
+      });
+
+      await recordAppError({
+        title: "Razorpay payment link over transaction limit",
+        message: limitErrorMessage,
+        severity: "WARNING",
+        source: "SERVER",
+        route: "/api/razorpay/create-payment-link",
+        area: "payments",
+        method: "POST",
+        statusCode: 400,
+        metadata: {
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          currency: invoiceCurrency,
+          outstandingAmount,
+          configuredLimit,
+        },
+      });
+
+      return NextResponse.json(
+        { success: false, error: limitErrorMessage },
+        { status: 400 }
+      );
+    }
 
     const paymentLinkResult = await createPaymentLink({
       amount: Math.round(outstandingAmount * 100),
@@ -114,24 +152,38 @@ export async function POST(request: Request) {
     });
 
     if (!paymentLinkResult.success || !paymentLinkResult.data) {
+      const rawErrorMessage = String(paymentLinkResult.error || "Failed to create payment link");
+      const isLimitError = isRazorpayAmountLimitError(rawErrorMessage);
+      const limitErrorMessage = isLimitError
+        ? buildRazorpayAmountLimitMessage({
+            currency: invoiceCurrency,
+            amount: outstandingAmount,
+            configuredLimit,
+          })
+        : rawErrorMessage;
+
       await recordAppError({
-        title: "Razorpay payment link creation failed",
-        message: String(paymentLinkResult.error || "Failed to create payment link"),
-        severity: "CRITICAL",
+        title: isLimitError
+          ? "Razorpay payment link over transaction limit"
+          : "Razorpay payment link creation failed",
+        message: limitErrorMessage,
+        severity: isLimitError ? "WARNING" : "CRITICAL",
         source: "SERVER",
         route: "/api/razorpay/create-payment-link",
         area: "payments",
         method: "POST",
-        statusCode: 500,
+        statusCode: isLimitError ? 400 : 500,
         metadata: {
           invoiceId: invoice.id,
           invoiceNumber: invoice.invoiceNumber,
           currency: invoiceCurrency,
+          outstandingAmount,
+          configuredLimit,
         },
       });
       return NextResponse.json(
-        { success: false, error: paymentLinkResult.error || "Failed to create payment link" },
-        { status: 500 }
+        { success: false, error: limitErrorMessage },
+        { status: isLimitError ? 400 : 500 }
       );
     }
 

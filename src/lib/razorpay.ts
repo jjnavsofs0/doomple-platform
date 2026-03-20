@@ -20,6 +20,55 @@ function getRazorpayInstance(): Razorpay {
   return new Razorpay({ key_id: keyId, key_secret: keySecret });
 }
 
+function parseConfiguredAmountLimit(value?: string | null) {
+  if (!value) return null;
+
+  const parsed = Number(String(value).trim());
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
+export function getRazorpayTransactionLimit(currency: string) {
+  const normalizedCurrency = String(currency || "INR").toUpperCase();
+  const currencySpecific =
+    process.env[`RAZORPAY_MAX_TRANSACTION_AMOUNT_${normalizedCurrency}`] || null;
+  const shared = process.env.RAZORPAY_MAX_TRANSACTION_AMOUNT || null;
+
+  return parseConfiguredAmountLimit(currencySpecific) ?? parseConfiguredAmountLimit(shared);
+}
+
+export function isRazorpayAmountLimitError(message: string) {
+  return /amount exceeds maximum amount allowed/i.test(message);
+}
+
+export function buildRazorpayAmountLimitMessage(params: {
+  currency: string;
+  amount: number;
+  configuredLimit?: number | null;
+}) {
+  const amountLabel = new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: params.currency,
+    maximumFractionDigits: 2,
+  }).format(params.amount);
+
+  const limitLabel =
+    typeof params.configuredLimit === "number" && Number.isFinite(params.configuredLimit)
+      ? new Intl.NumberFormat("en-IN", {
+          style: "currency",
+          currency: params.currency,
+          maximumFractionDigits: 2,
+        }).format(params.configuredLimit)
+      : null;
+
+  return limitLabel
+    ? `This invoice balance (${amountLabel}) exceeds the configured Razorpay transaction limit (${limitLabel}) for ${params.currency}. Use bank transfer/manual collection or raise the limit in Razorpay.`
+    : `This invoice balance (${amountLabel}) exceeds the Razorpay transaction limit for ${params.currency} on this account. Use bank transfer/manual collection or raise the limit in Razorpay.`;
+}
+
 export interface CreateOrderParams {
   amount: number; // in paise (smallest currency unit)
   currency: string;

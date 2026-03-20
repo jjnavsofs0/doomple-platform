@@ -3,7 +3,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { isGatewaySupportedForCurrency, normalizeCurrency } from "@/lib/billing";
-import { createOrder } from "@/lib/razorpay";
+import {
+  buildRazorpayAmountLimitMessage,
+  createOrder,
+  getRazorpayTransactionLimit,
+  isRazorpayAmountLimitError,
+} from "@/lib/razorpay";
 import { getOutstandingAmount } from "@/lib/invoice-payments";
 import { canAccessInvoiceForPayment } from "@/lib/invoice-access";
 import { getErrorMessage, getErrorStack, recordAppError } from "@/lib/app-error-log";
@@ -65,6 +70,7 @@ export async function POST(request: Request) {
 
     // Convert amount to paise (smallest currency unit)
     const amountInPaise = Math.round(outstandingAmount * 100);
+    const configuredLimit = getRazorpayTransactionLimit(invoiceCurrency);
 
     if (!(await isGatewaySupportedForCurrency("RAZORPAY", invoiceCurrency))) {
       return NextResponse.json(
@@ -72,6 +78,37 @@ export async function POST(request: Request) {
           success: false,
           error: `Razorpay is not enabled for ${invoiceCurrency} invoices. Update payment gateway settings or use a supported currency.`,
         },
+        { status: 400 }
+      );
+    }
+
+    if (configuredLimit !== null && outstandingAmount > configuredLimit) {
+      const limitErrorMessage = buildRazorpayAmountLimitMessage({
+        currency: invoiceCurrency,
+        amount: outstandingAmount,
+        configuredLimit,
+      });
+
+      await recordAppError({
+        title: "Razorpay order over transaction limit",
+        message: limitErrorMessage,
+        severity: "WARNING",
+        source: "SERVER",
+        route: "/api/razorpay/create-order",
+        area: "payments",
+        method: "POST",
+        statusCode: 400,
+        metadata: {
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          currency: invoiceCurrency,
+          outstandingAmount,
+          configuredLimit,
+        },
+      });
+
+      return NextResponse.json(
+        { success: false, error: limitErrorMessage },
         { status: 400 }
       );
     }
@@ -89,25 +126,42 @@ export async function POST(request: Request) {
     });
 
     if (!orderResult.success) {
-      console.error("Razorpay order creation failed:", orderResult.error);
+      const rawErrorMessage = String(orderResult.error || "Unknown Razorpay order failure");
+      const isLimitError = isRazorpayAmountLimitError(rawErrorMessage);
+      const limitErrorMessage = isLimitError
+        ? buildRazorpayAmountLimitMessage({
+            currency: invoiceCurrency,
+            amount: outstandingAmount,
+            configuredLimit,
+          })
+        : rawErrorMessage;
+
+      console.error(
+        isLimitError ? "Razorpay order over transaction limit:" : "Razorpay order creation failed:",
+        rawErrorMessage
+      );
       await recordAppError({
-        title: "Razorpay order creation failed",
-        message: String(orderResult.error || "Unknown Razorpay order failure"),
-        severity: "CRITICAL",
+        title: isLimitError
+          ? "Razorpay order over transaction limit"
+          : "Razorpay order creation failed",
+        message: limitErrorMessage,
+        severity: isLimitError ? "WARNING" : "CRITICAL",
         source: "SERVER",
         route: "/api/razorpay/create-order",
         area: "payments",
         method: "POST",
-        statusCode: 500,
+        statusCode: isLimitError ? 400 : 500,
         metadata: {
           invoiceId: invoice.id,
           invoiceNumber: invoice.invoiceNumber,
           currency: invoiceCurrency,
+          outstandingAmount,
+          configuredLimit,
         },
       });
       return NextResponse.json(
-        { success: false, error: orderResult.error },
-        { status: 500 }
+        { success: false, error: limitErrorMessage },
+        { status: isLimitError ? 400 : 500 }
       );
     }
 
