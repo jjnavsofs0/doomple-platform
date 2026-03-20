@@ -16,6 +16,10 @@ type ClientErrorPayload = {
 
 const sentFingerprints = new Set<string>();
 
+function isIgnorableClientNoise(message: string) {
+  return /ResizeObserver loop completed with undelivered notifications/i.test(message);
+}
+
 function buildFingerprint(payload: ClientErrorPayload) {
   return [
     payload.source,
@@ -52,13 +56,18 @@ export function ErrorMonitor() {
   React.useEffect(() => {
     const handleError = (event: ErrorEvent) => {
       const isChunkError = isChunkLoadError(event.error || event.message);
+      const message =
+        event.error instanceof Error
+          ? event.error.message
+          : event.message || "Client runtime error";
+
+      if (isIgnorableClientNoise(message)) {
+        return;
+      }
 
       void sendClientError({
         title: isChunkError ? "Chunk asset failed to load" : event.message || "Client runtime error",
-        message:
-          event.error instanceof Error
-            ? event.error.message
-            : event.message || "Client runtime error",
+        message,
         severity: isChunkError ? "CRITICAL" : "ERROR",
         source: "CLIENT",
         route: window.location.pathname,
@@ -86,6 +95,10 @@ export function ErrorMonitor() {
           : typeof reason === "string"
             ? reason
             : "Unhandled client promise rejection";
+
+      if (isIgnorableClientNoise(message)) {
+        return;
+      }
 
       void sendClientError({
         title: isChunkError ? "Chunk asset failed to load" : "Unhandled client promise rejection",

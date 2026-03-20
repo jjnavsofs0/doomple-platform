@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SectionWrapper } from "@/components/layouts";
+import { SectionWrapper } from "@/components/layouts/section-wrapper";
 import { BookOpen, GraduationCap, ClipboardList, Users, BrainCircuit, ArrowRight, CheckCircle2 } from "lucide-react";
 
 export function UepHighlight() {

@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { Bell } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { useCurrentSession } from "@/hooks/use-current-session";
 import { getUserPrivateChannel } from "@/lib/realtime";
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
 
@@ -19,7 +19,7 @@ type NotificationItem = {
 };
 
 export function NotificationInbox() {
-  const { data: session } = useSession();
+  const { data: session } = useCurrentSession();
   const [open, setOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
   const [items, setItems] = React.useState<NotificationItem[]>([]);

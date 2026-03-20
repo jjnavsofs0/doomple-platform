@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useSession } from "next-auth/react";
 import {
   BadgeCheck,
   BellOff,
@@ -29,6 +28,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
+import { useCurrentSession } from "@/hooks/use-current-session";
 
 type ProfileData = {
   id: string;
@@ -69,7 +69,7 @@ const roleCapabilities: Record<string, string[]> = {
 };
 
 export default function ProfilePage() {
-  const { data: session, status, update } = useSession();
+  const { data: session, status, setSessionData } = useCurrentSession();
   const { toast } = useToast();
   const [profile, setProfile] = React.useState<ProfileData | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -99,6 +99,29 @@ export default function ProfilePage() {
   const textareaBlockClassName =
     "rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3";
 
+  const syncSessionUser = React.useCallback(
+    (nextProfile: ProfileData) => {
+      setSessionData((current) => {
+        if (!current?.user) {
+          return current;
+        }
+
+        return {
+          ...current,
+          user: {
+            ...current.user,
+            name: nextProfile.name,
+            email: nextProfile.email,
+            image: nextProfile.avatar,
+            role: nextProfile.role,
+            emailVerificationStatus: nextProfile.emailVerificationStatus,
+          },
+        };
+      });
+    },
+    [setSessionData]
+  );
+
   const fetchProfile = React.useCallback(async () => {
     try {
       setLoading(true);
@@ -118,32 +141,14 @@ export default function ProfilePage() {
         transactionalEmailsEnabled: result.data.transactionalEmailsEnabled !== false,
         marketingEmailsEnabled: result.data.marketingEmailsEnabled !== false,
       });
-
-      if (
-        session?.user &&
-        (session.user.name !== result.data.name ||
-          session.user.email !== result.data.email ||
-          session.user.image !== result.data.avatar ||
-          session.user.emailVerificationStatus !== result.data.emailVerificationStatus)
-      ) {
-        await update({
-          user: {
-            ...session.user,
-            name: result.data.name,
-            email: result.data.email,
-            image: result.data.avatar,
-            role: result.data.role,
-            emailVerificationStatus: result.data.emailVerificationStatus,
-          },
-        });
-      }
+      syncSessionUser(result.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch profile");
       setProfile(null);
     } finally {
       setLoading(false);
     }
-  }, [session?.user, update]);
+  }, [syncSessionUser]);
 
   React.useEffect(() => {
     if (status === "authenticated") {
@@ -169,16 +174,7 @@ export default function ProfilePage() {
       }
 
       setProfile(result.data);
-      await update({
-        user: {
-          ...session?.user,
-          name: result.data.name,
-          email: result.data.email,
-          image: result.data.avatar,
-          role: result.data.role,
-          emailVerificationStatus: result.data.emailVerificationStatus,
-        },
-      });
+      syncSessionUser(result.data);
 
       setProfileForm({
         name: result.data.name || "",
@@ -224,16 +220,7 @@ export default function ProfilePage() {
       }
 
       setProfile(result.data);
-      await update({
-        user: {
-          ...session?.user,
-          name: result.data.name,
-          email: result.data.email,
-          image: result.data.avatar,
-          role: result.data.role,
-          emailVerificationStatus: result.data.emailVerificationStatus,
-        },
-      });
+      syncSessionUser(result.data);
       toast({
         type: "success",
         title: "Profile photo updated",

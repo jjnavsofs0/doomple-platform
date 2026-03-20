@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ComponentType, SVGProps } from "react";
-import { SectionWrapper } from "@/components/layouts";
+import { SectionWrapper } from "@/components/layouts/section-wrapper";
 import { services } from "@/data/services";
 import * as Icons from "lucide-react";
 import { ArrowRight } from "lucide-react";

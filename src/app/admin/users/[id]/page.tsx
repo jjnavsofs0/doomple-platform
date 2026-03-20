@@ -3,7 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { format } from "date-fns";
 import {
   BadgeCheck,
@@ -30,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
+import { useCurrentSession } from "@/hooks/use-current-session";
 
 type UserDetail = {
   id: string;
@@ -102,7 +102,7 @@ const roleLabels: Record<string, string> = {
 };
 
 export default function UserDetailPage() {
-  const { data: session } = useSession();
+  const { data: session } = useCurrentSession();
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [user, setUser] = React.useState<UserDetail | null>(null);

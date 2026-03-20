@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { signOut, useSession } from 'next-auth/react';
+import { signOut } from 'next-auth/react';
 import {
   BriefcaseBusiness,
   CreditCard,
@@ -15,6 +15,7 @@ import {
   UserCircle2,
   X,
 } from 'lucide-react';
+import { useCurrentSession } from '@/hooks/use-current-session';
 import { NotificationInbox } from '@/components/notifications/notification-inbox';
 
 const navItems = [
@@ -30,7 +31,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { data: session } = useCurrentSession();
   const [profile, setProfile] = useState<{
     companyName: string;
     contactPerson: string;

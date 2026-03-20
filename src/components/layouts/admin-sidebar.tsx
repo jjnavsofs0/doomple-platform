@@ -18,10 +18,11 @@ import {
   Shield,
   Users,
 } from "lucide-react";
-import { signOut, useSession } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { DoompleLogo } from "@/components/ui/doomple-logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useCurrentSession } from "@/hooks/use-current-session";
 import { ADMIN_GLOBAL_CHANNEL } from "@/lib/realtime";
 import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
 
@@ -124,7 +125,7 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [openErrorCount, setOpenErrorCount] = useState(0);
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { data: session } = useCurrentSession();
 
   const role = (session?.user as { role?: string })?.role || "";
   const canViewErrors = role === "SUPER_ADMIN" || role === "ADMIN";

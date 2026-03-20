@@ -1,7 +1,8 @@
 import { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { PublicFooter, PublicHeader } from "@/components/layouts";
+import { PublicFooter } from "@/components/layouts/public-footer";
+import { PublicHeader } from "@/components/layouts/public-header";
 import {
   ArrowRight,
   Award,

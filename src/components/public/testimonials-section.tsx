@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SectionWrapper } from "@/components/layouts";
+import { SectionWrapper } from "@/components/layouts/section-wrapper";
 import { Star, ArrowRight } from "lucide-react";
 
 export function TestimonialsSection() {

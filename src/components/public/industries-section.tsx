@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SectionWrapper } from "@/components/layouts";
+import { SectionWrapper } from "@/components/layouts/section-wrapper";
 import { industries } from "@/data/industries";
 import { ArrowRight } from "lucide-react";
 

@@ -2,10 +2,13 @@
   "name": "doomple-platform",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
-    "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
-    "start": "next start",
+    "dev": "unset NODE_ENV && next dev",
+    "build": "unset NODE_ENV && prisma generate && prisma migrate deploy && next build",
+    "start": "unset NODE_ENV && next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

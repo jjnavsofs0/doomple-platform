@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, LogOut, Menu, Settings, User } from "lucide-react";
-import { signOut, useSession } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { NotificationInbox } from "@/components/notifications/notification-inbox";
+import { useCurrentSession } from "@/hooks/use-current-session";
 
 interface AdminHeaderProps {
   onMenuClick?: () => void;
@@ -44,7 +45,7 @@ export function AdminHeader({
 }: AdminHeaderProps) {
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { data: session } = useCurrentSession();
 
   const initials = session?.user?.name
     ? session.user.name

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SectionWrapper } from "@/components/layouts";
+import { SectionWrapper } from "@/components/layouts/section-wrapper";
 import {
   Server, ArrowRight, CheckCircle2,
   ShieldCheck, Users, CreditCard, Bell, BarChart3, Lock,

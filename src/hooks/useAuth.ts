@@ -1,7 +1,7 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import { useMemo } from "react";
+import { useCurrentSession } from "@/hooks/use-current-session";
 
 export interface AuthUser {
   id: string;
@@ -22,7 +22,7 @@ const ADMIN_ROLES = ["SUPER_ADMIN", "ADMIN", "SALES", "PROJECT_MANAGER", "FINANC
 const CLIENT_ROLES = ["CLIENT"];
 
 export function useAuth(): UseAuthReturn {
-  const { data: session, status } = useSession();
+  const { data: session, status } = useCurrentSession();
 
   const user = useMemo(() => {
     if (!session?.user) return null;

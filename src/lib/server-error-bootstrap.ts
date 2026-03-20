@@ -64,6 +64,21 @@ function isNodeDeprecationWarningMessage(value: unknown) {
   );
 }
 
+function isIgnorableDevRuntimeMessage(value: unknown) {
+  const text = normalizeValue(value);
+
+  return (
+    text.includes("fallback-build-manifest.json") ||
+    text.includes(".next/cache/webpack/") ||
+    (text.includes("Cannot find module './") &&
+      text.includes(".next/server/webpack-runtime.js") &&
+      (text.includes("server/dev/hot-middleware.js") ||
+        text.includes("server/dev/hot-reloader-webpack.js") ||
+        text.includes("server/lib/router-utils/setup-dev-bundler.js"))) ||
+    text.includes("Failed to generate static paths for /")
+  );
+}
+
 function registerServerErrorLogging() {
   if (
     typeof window !== "undefined" ||
@@ -78,6 +93,13 @@ function registerServerErrorLogging() {
     originalConsoleError(...args);
 
     if (args.some((arg) => isNodeDeprecationWarningMessage(arg))) {
+      return;
+    }
+
+    if (
+      process.env.NODE_ENV !== "production" &&
+      args.some((arg) => isIgnorableDevRuntimeMessage(arg))
+    ) {
       return;
     }
 
