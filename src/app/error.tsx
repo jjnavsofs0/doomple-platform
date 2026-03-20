@@ -82,7 +82,7 @@ export default function GlobalAppError({
               <Button
                 onClick={() => {
                   if (isChunkError) {
-                    window.location.reload();
+                    attemptChunkReload({ force: true });
                     return;
                   }
 

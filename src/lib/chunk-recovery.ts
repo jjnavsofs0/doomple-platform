@@ -1,5 +1,6 @@
 const CHUNK_RELOAD_STORAGE_KEY = "doomple:chunk-reload-at";
 const CHUNK_RELOAD_COOLDOWN_MS = 30_000;
+const CHUNK_RELOAD_QUERY_PARAM = "__doomple_chunk_reload";
 
 export function isChunkLoadError(error: unknown) {
   const message =
@@ -16,7 +17,7 @@ export function isChunkLoadError(error: unknown) {
   );
 }
 
-export function attemptChunkReload() {
+export function attemptChunkReload(options?: { force?: boolean }) {
   if (typeof window === "undefined") {
     return false;
   }
@@ -24,11 +25,14 @@ export function attemptChunkReload() {
   const now = Date.now();
   const previousAttemptAt = Number(sessionStorage.getItem(CHUNK_RELOAD_STORAGE_KEY) || "0");
 
-  if (previousAttemptAt && now - previousAttemptAt < CHUNK_RELOAD_COOLDOWN_MS) {
+  if (!options?.force && previousAttemptAt && now - previousAttemptAt < CHUNK_RELOAD_COOLDOWN_MS) {
     return false;
   }
 
   sessionStorage.setItem(CHUNK_RELOAD_STORAGE_KEY, String(now));
-  window.location.reload();
+
+  const url = new URL(window.location.href);
+  url.searchParams.set(CHUNK_RELOAD_QUERY_PARAM, String(now));
+  window.location.replace(url.toString());
   return true;
 }
