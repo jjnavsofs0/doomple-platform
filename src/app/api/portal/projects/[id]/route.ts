@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getProjectCoreSelect, supportsProjectCurrencyField } from "@/lib/project-db-compat";
 import { prisma } from "@/lib/prisma";
 import { getPortalClient } from "@/lib/portal";
 
@@ -26,13 +27,15 @@ export async function GET(
     if ("error" in portalClient) {
       return NextResponse.json({ error: portalClient.error }, { status: portalClient.status });
     }
+    const projectCurrencySupported = await supportsProjectCurrencyField();
 
     const project = await prisma.project.findFirst({
       where: {
         id: params.id,
         clientId: portalClient.client.id,
       },
-      include: {
+      select: {
+        ...getProjectCoreSelect(projectCurrencySupported),
         milestones: {
           orderBy: { order: "asc" },
         },

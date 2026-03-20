@@ -53,7 +53,8 @@ export async function GET(
       if (!hasAccess && file.entityType === "project") {
         const project = await prisma.project.findUnique({
           where: { id: file.entityId },
-          include: {
+          select: {
+            id: true,
             client: {
               select: { email: true },
             },

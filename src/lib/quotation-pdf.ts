@@ -6,7 +6,19 @@ export async function generateQuotationPdf(quotationId: string) {
   const quotation = await prisma.quotation.findUnique({
     where: { id: quotationId },
     include: {
-      client: true,
+      client: {
+        select: {
+          companyName: true,
+          contactName: true,
+          email: true,
+          phone: true,
+          billingAddress: true,
+          city: true,
+          state: true,
+          country: true,
+          postalCode: true,
+        },
+      },
       lead: { select: { fullName: true, email: true, phone: true } },
       createdBy: { select: { name: true, email: true } },
       items: { orderBy: { order: "asc" } },

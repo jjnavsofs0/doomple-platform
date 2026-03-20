@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notifyAdmins, notifyClientUsersByEmail } from "@/lib/realtime";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }
@@ -68,6 +70,14 @@ export async function POST(
 
     const existingClient = await prisma.client.findUnique({
       where: { email: lead.email },
+      select: {
+        id: true,
+        companyName: true,
+        contactName: true,
+        email: true,
+        phone: true,
+        country: true,
+      },
     });
 
     const client = existingClient
@@ -107,7 +117,14 @@ export async function POST(
         billingModel: ((body.billingModel as string) || "FIXED_PRICE") as import("@prisma/client").BillingModel,
       },
       include: {
-        client: true,
+        client: {
+          select: {
+            id: true,
+            companyName: true,
+            contactName: true,
+            email: true,
+          },
+        },
       },
     });
 

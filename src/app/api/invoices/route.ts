@@ -21,6 +21,8 @@ async function generateInvoiceNumber(): Promise<string> {
   return `${invoicePreferences.prefix || "DINV"}-${year}${month}-${random}`;
 }
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -262,6 +264,7 @@ export async function POST(request: Request) {
     // Check if client exists
     const clientExists = await prisma.client.findUnique({
       where: { id: normalizedData.clientId },
+      select: { id: true },
     });
 
     if (!clientExists) {

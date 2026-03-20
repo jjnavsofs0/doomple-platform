@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { attemptChunkReload, isChunkLoadError } from "@/lib/chunk-recovery";
 
 type ClientErrorPayload = {
   title: string;
@@ -50,16 +51,18 @@ async function sendClientError(payload: ClientErrorPayload) {
 export function ErrorMonitor() {
   React.useEffect(() => {
     const handleError = (event: ErrorEvent) => {
+      const isChunkError = isChunkLoadError(event.error || event.message);
+
       void sendClientError({
-        title: event.message || "Client runtime error",
+        title: isChunkError ? "Chunk asset failed to load" : event.message || "Client runtime error",
         message:
           event.error instanceof Error
             ? event.error.message
             : event.message || "Client runtime error",
-        severity: "ERROR",
+        severity: isChunkError ? "CRITICAL" : "ERROR",
         source: "CLIENT",
         route: window.location.pathname,
-        area: "window.onerror",
+        area: isChunkError ? "chunk-load" : "window.onerror",
         stack: event.error instanceof Error ? event.error.stack || null : null,
         metadata: {
           filename: event.filename || null,
@@ -68,10 +71,15 @@ export function ErrorMonitor() {
           userAgent: navigator.userAgent,
         },
       });
+
+      if (isChunkError) {
+        attemptChunkReload();
+      }
     };
 
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason;
+      const isChunkError = isChunkLoadError(reason);
       const message =
         reason instanceof Error
           ? reason.message
@@ -80,17 +88,21 @@ export function ErrorMonitor() {
             : "Unhandled client promise rejection";
 
       void sendClientError({
-        title: "Unhandled client promise rejection",
+        title: isChunkError ? "Chunk asset failed to load" : "Unhandled client promise rejection",
         message,
-        severity: "ERROR",
+        severity: isChunkError ? "CRITICAL" : "ERROR",
         source: "CLIENT",
         route: window.location.pathname,
-        area: "window.unhandledrejection",
+        area: isChunkError ? "chunk-load" : "window.unhandledrejection",
         stack: reason instanceof Error ? reason.stack || null : null,
         metadata: {
           userAgent: navigator.userAgent,
         },
       });
+
+      if (isChunkError) {
+        attemptChunkReload();
+      }
     };
 
     window.addEventListener("error", handleError);

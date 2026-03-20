@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sendTransactionalEmail } from "@/lib/email";
+import { notifyAdmins } from "@/lib/realtime";
 
 export type AppErrorSeverityValue = "INFO" | "WARNING" | "ERROR" | "CRITICAL";
 export type AppErrorSourceValue = "CLIENT" | "SERVER" | "RENDER";
@@ -67,9 +68,10 @@ function getAlertRecipients() {
   return fallback ? [fallback] : [];
 }
 
-async function sendCriticalAlertEmail(params: {
+async function sendErrorAlertEmail(params: {
   title: string;
   message: string;
+  severity: AppErrorSeverityValue;
   route?: string | null;
   source: AppErrorSourceValue;
   area?: string | null;
@@ -81,7 +83,7 @@ async function sendCriticalAlertEmail(params: {
   const recipients = getAlertRecipients();
   if (recipients.length === 0) return;
 
-  const subject = `[Doomple Critical Error] ${params.title}`;
+  const subject = `[Doomple ${params.severity === "CRITICAL" ? "Critical" : "Error"}] ${params.title}`;
   const metadataBlock = params.metadata
     ? JSON.stringify(params.metadata, null, 2)
     : "None";
@@ -89,6 +91,7 @@ async function sendCriticalAlertEmail(params: {
   const text = [
     "A critical application error was recorded.",
     "",
+    `Severity: ${params.severity}`,
     `Title: ${params.title}`,
     `Message: ${params.message}`,
     `Source: ${params.source}`,
@@ -106,7 +109,8 @@ async function sendCriticalAlertEmail(params: {
 
   const html = `
     <div style="font-family:Arial,sans-serif;color:#0f172a">
-      <h2 style="margin:0 0 16px">Critical application error recorded</h2>
+      <h2 style="margin:0 0 16px">${params.severity === "CRITICAL" ? "Critical" : "Application"} error recorded</h2>
+      <p><strong>Severity:</strong> ${params.severity}</p>
       <p><strong>Title:</strong> ${params.title}</p>
       <p><strong>Message:</strong> ${params.message}</p>
       <p><strong>Source:</strong> ${params.source}</p>
@@ -183,22 +187,25 @@ export async function recordAppError(params: RecordAppErrorParams) {
       });
 
   const shouldAlert =
-    severity === "CRITICAL" &&
+    (severity === "CRITICAL" || severity === "ERROR") &&
     (!log.lastAlertedAt ||
       now.getTime() - new Date(log.lastAlertedAt).getTime() > ALERT_COOLDOWN_MS);
 
   if (shouldAlert) {
     try {
-      await sendCriticalAlertEmail({
-        title,
-        message,
-        route: params.route || null,
-        source,
-        area: params.area || null,
-        statusCode: params.statusCode ?? null,
-        occurrences: existing ? existing.occurrences + 1 : 1,
-        stack: params.stack || null,
-        metadata: params.metadata || null,
+      await notifyAdmins({
+        title: severity === "CRITICAL" ? "Critical app error" : "Application error",
+        message: `${title}${params.route ? ` on ${params.route}` : ""}`,
+        type: "SYSTEM",
+        link: "/admin/errors",
+        topics: ["errors", "notifications", "dashboard"],
+        metadata: {
+          errorId: log.id,
+          severity,
+          route: params.route || null,
+          area: params.area || null,
+          statusCode: params.statusCode ?? null,
+        },
       });
 
       await prisma.appErrorLog.update({
@@ -207,9 +214,29 @@ export async function recordAppError(params: RecordAppErrorParams) {
           lastAlertedAt: now,
         },
       });
+    } catch (notificationError) {
+      console.warn(
+        "App error notification could not be delivered:",
+        notificationError instanceof Error ? notificationError.message : notificationError
+      );
+    }
+
+    try {
+      await sendErrorAlertEmail({
+        title,
+        message,
+        severity,
+        route: params.route || null,
+        source,
+        area: params.area || null,
+        statusCode: params.statusCode ?? null,
+        occurrences: existing ? existing.occurrences + 1 : 1,
+        stack: params.stack || null,
+        metadata: params.metadata || null,
+      });
     } catch (emailError) {
       console.warn(
-        "Critical error alert email could not be sent:",
+        "Error alert email could not be sent:",
         emailError instanceof Error ? emailError.message : emailError
       );
     }

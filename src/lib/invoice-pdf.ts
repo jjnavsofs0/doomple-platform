@@ -7,7 +7,19 @@ export async function getInvoicePdfData(invoiceId: string) {
   const invoice = await prisma.invoice.findUnique({
     where: { id: invoiceId },
     include: {
-      client: true,
+      client: {
+        select: {
+          companyName: true,
+          contactName: true,
+          email: true,
+          phone: true,
+          billingAddress: true,
+          city: true,
+          state: true,
+          country: true,
+          postalCode: true,
+        },
+      },
       project: {
         select: {
           name: true,

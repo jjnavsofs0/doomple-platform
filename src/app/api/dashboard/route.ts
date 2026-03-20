@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { getProjectCoreSelect, supportsProjectCurrencyField } from "@/lib/project-db-compat";
 import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
@@ -12,6 +15,7 @@ export async function GET(request: Request) {
 
     const url = new URL(request.url);
     const type = url.searchParams.get("type") || "management";
+    const projectCurrencySupported = await supportsProjectCurrencyField();
 
     // ---- Sales/Leads ----
     const leads = await prisma.lead.findMany({
@@ -46,7 +50,10 @@ export async function GET(request: Request) {
 
     // ---- Projects ----
     const projects = await prisma.project.findMany({
-      include: { client: { select: { companyName: true, contactName: true } } },
+      select: {
+        ...getProjectCoreSelect(projectCurrencySupported),
+        client: { select: { companyName: true, contactName: true } },
+      },
       orderBy: { createdAt: "desc" },
     });
 

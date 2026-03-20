@@ -28,6 +28,8 @@ const normalizeMilestoneStatus = (
   return fallback;
 };
 
+export const dynamic = "force-dynamic";
+
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string; milestoneId: string } }

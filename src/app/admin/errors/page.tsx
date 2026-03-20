@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertCircle, CheckCircle2, RefreshCcw, ShieldAlert } from "lucide-react";
+import { AlertCircle, CheckCircle2, Copy, RefreshCcw, ShieldAlert } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,33 @@ const severityStyles: Record<AppErrorLog["severity"], string> = {
   ERROR: "bg-red-100 text-red-700",
   CRITICAL: "bg-rose-100 text-rose-700",
 };
+
+function buildCopyPayload(log: AppErrorLog) {
+  return JSON.stringify(
+    {
+      title: log.title,
+      message: log.message,
+      severity: log.severity,
+      source: log.source,
+      route: log.route,
+      area: log.area,
+      method: log.method,
+      statusCode: log.statusCode,
+      occurrences: log.occurrences,
+      firstSeenAt: log.firstSeenAt,
+      lastSeenAt: log.lastSeenAt,
+      lastAlertedAt: log.lastAlertedAt,
+      isResolved: log.isResolved,
+      resolvedAt: log.resolvedAt,
+      actorName: log.actorName,
+      resolvedByName: log.resolvedByName,
+      metadata: log.metadata,
+      stack: log.stack,
+    },
+    null,
+    2
+  );
+}
 
 export default function AdminErrorsPage() {
   const { toast } = useToast();
@@ -125,6 +152,27 @@ export default function AdminErrorsPage() {
       }
     },
     [fetchLogs, toast]
+  );
+
+  const copyErrorDetails = React.useCallback(
+    async (log: AppErrorLog) => {
+      try {
+        await navigator.clipboard.writeText(buildCopyPayload(log));
+        toast({
+          type: "success",
+          title: "Error details copied",
+          description: "The full error payload is ready to paste into a ticket or editor.",
+        });
+      } catch (copyError) {
+        toast({
+          type: "error",
+          title: "Copy failed",
+          description:
+            copyError instanceof Error ? copyError.message : "Could not copy the error payload.",
+        });
+      }
+    },
+    [toast]
   );
 
   return (
@@ -284,6 +332,10 @@ export default function AdminErrorsPage() {
                   </div>
 
                   <div className="flex flex-row gap-3 xl:flex-col">
+                    <Button variant="outline" onClick={() => void copyErrorDetails(log)}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy details
+                    </Button>
                     <Button
                       variant={log.isResolved ? "outline" : "default"}
                       onClick={() => updateResolution(log, !log.isResolved)}

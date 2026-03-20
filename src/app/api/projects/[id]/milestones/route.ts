@@ -28,6 +28,8 @@ const normalizeMilestoneStatus = (
   return fallback;
 };
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -40,7 +42,9 @@ export async function GET(
 
     const projectExists = await prisma.project.findUnique({
       where: { id: params.id },
-      include: {
+      select: {
+        id: true,
+        name: true,
         client: {
           select: {
             email: true,
@@ -86,7 +90,9 @@ export async function POST(
 
     const projectExists = await prisma.project.findUnique({
       where: { id: params.id },
-      include: {
+      select: {
+        id: true,
+        name: true,
         client: {
           select: {
             email: true,
@@ -185,7 +191,9 @@ export async function PUT(
 
     const projectExists = await prisma.project.findUnique({
       where: { id: params.id },
-      include: {
+      select: {
+        id: true,
+        name: true,
         client: {
           select: {
             email: true,

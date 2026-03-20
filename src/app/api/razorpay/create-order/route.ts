@@ -8,6 +8,8 @@ import { getOutstandingAmount } from "@/lib/invoice-payments";
 import { canAccessInvoiceForPayment } from "@/lib/invoice-access";
 import { getErrorMessage, getErrorStack, recordAppError } from "@/lib/app-error-log";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);

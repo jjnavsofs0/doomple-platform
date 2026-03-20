@@ -34,6 +34,8 @@ const formatInvoiceResponse = (invoice: any) => ({
   })),
 });
 
+export const dynamic = "force-dynamic";
+
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }
@@ -116,6 +118,7 @@ export async function POST(
         type: "PAYMENT",
         link: `/admin/invoices/${params.id}`,
         topics: ["dashboard", "invoices", "payments", "notifications"],
+        email: true,
         metadata: {
           invoiceId: params.id,
           paymentId: payment.id,

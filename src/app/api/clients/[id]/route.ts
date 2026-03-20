@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { getClientCoreSelect, supportsClientBankingFields } from "@/lib/client-db-compat";
 import { prisma } from "@/lib/prisma";
 import { notifyAdmins } from "@/lib/realtime";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(
   request: Request,
@@ -14,9 +17,12 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const bankingFieldsSupported = await supportsClientBankingFields();
+
     const client = await prisma.client.findUnique({
       where: { id: params.id },
-      include: {
+      select: {
+        ...getClientCoreSelect(bankingFieldsSupported),
         projects: {
           select: {
             id: true,
@@ -83,6 +89,11 @@ export async function GET(
       success: true,
       data: {
         ...client,
+        panNumber: "panNumber" in client ? client.panNumber : null,
+        bankName: "bankName" in client ? client.bankName : null,
+        bankAccountNumber:
+          "bankAccountNumber" in client ? client.bankAccountNumber : null,
+        ifscCode: "ifscCode" in client ? client.ifscCode : null,
         contactPersonName: client.contactName,
         address: client.billingAddress,
         status: client.isActive ? "active" : "inactive",
@@ -107,10 +118,12 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const bankingFieldsSupported = await supportsClientBankingFields();
     const body = await request.json();
 
     const existingClient = await prisma.client.findUnique({
       where: { id: params.id },
+      select: getClientCoreSelect(bankingFieldsSupported),
     });
 
     if (!existingClient) {
@@ -134,48 +147,67 @@ export async function PUT(
       }
     }
 
+    const updateData: Record<string, unknown> = {
+      type: body.type || existingClient.type,
+      companyName:
+        body.companyName !== undefined
+          ? body.companyName
+          : existingClient.companyName,
+      contactName:
+        body.contactName !== undefined
+          ? body.contactName
+          : existingClient.contactName,
+      email: body.email || existingClient.email,
+      phone: body.phone !== undefined ? body.phone : existingClient.phone,
+      billingAddress:
+        body.billingAddress !== undefined
+          ? body.billingAddress
+          : existingClient.billingAddress,
+      city: body.city !== undefined ? body.city : existingClient.city,
+      state: body.state !== undefined ? body.state : existingClient.state,
+      postalCode:
+        body.postalCode !== undefined
+          ? body.postalCode
+          : existingClient.postalCode,
+      country:
+        body.country !== undefined ? body.country : existingClient.country,
+      gstNumber:
+        body.gstNumber !== undefined ? body.gstNumber : existingClient.gstNumber,
+      notes: body.notes !== undefined ? body.notes : existingClient.notes,
+      isActive:
+        body.isActive !== undefined ? body.isActive : existingClient.isActive,
+    };
+
+    if (bankingFieldsSupported) {
+      updateData.panNumber =
+        body.panNumber !== undefined
+          ? body.panNumber
+          : "panNumber" in existingClient
+            ? existingClient.panNumber
+            : null;
+      updateData.bankName =
+        body.bankName !== undefined
+          ? body.bankName
+          : "bankName" in existingClient
+            ? existingClient.bankName
+            : null;
+      updateData.bankAccountNumber =
+        body.bankAccountNumber !== undefined
+          ? body.bankAccountNumber
+          : "bankAccountNumber" in existingClient
+            ? existingClient.bankAccountNumber
+            : null;
+      updateData.ifscCode =
+        body.ifscCode !== undefined
+          ? body.ifscCode
+          : "ifscCode" in existingClient
+            ? existingClient.ifscCode
+            : null;
+    }
+
     const updatedClient = await prisma.client.update({
       where: { id: params.id },
-      data: {
-        type: body.type || existingClient.type,
-        companyName:
-          body.companyName !== undefined
-            ? body.companyName
-            : existingClient.companyName,
-        contactName:
-          body.contactName !== undefined
-            ? body.contactName
-            : existingClient.contactName,
-        email: body.email || existingClient.email,
-        phone: body.phone !== undefined ? body.phone : existingClient.phone,
-        billingAddress:
-          body.billingAddress !== undefined
-            ? body.billingAddress
-            : existingClient.billingAddress,
-        city: body.city !== undefined ? body.city : existingClient.city,
-        state: body.state !== undefined ? body.state : existingClient.state,
-        postalCode:
-          body.postalCode !== undefined
-            ? body.postalCode
-            : existingClient.postalCode,
-        country:
-          body.country !== undefined ? body.country : existingClient.country,
-        gstNumber:
-          body.gstNumber !== undefined ? body.gstNumber : existingClient.gstNumber,
-        panNumber:
-          body.panNumber !== undefined ? body.panNumber : existingClient.panNumber,
-        bankName:
-          body.bankName !== undefined ? body.bankName : existingClient.bankName,
-        bankAccountNumber:
-          body.bankAccountNumber !== undefined
-            ? body.bankAccountNumber
-            : existingClient.bankAccountNumber,
-        ifscCode:
-          body.ifscCode !== undefined ? body.ifscCode : existingClient.ifscCode,
-        notes: body.notes !== undefined ? body.notes : existingClient.notes,
-        isActive:
-          body.isActive !== undefined ? body.isActive : existingClient.isActive,
-      },
+      data: updateData,
     });
 
     await notifyAdmins({
@@ -217,7 +249,9 @@ export async function DELETE(
 
     const client = await prisma.client.findUnique({
       where: { id: params.id },
-      include: {
+      select: {
+        id: true,
+        companyName: true,
         projects: true,
       },
     });

@@ -9,6 +9,8 @@ import { canAccessInvoiceForPayment } from "@/lib/invoice-access";
 import { getErrorMessage, getErrorStack, recordAppError } from "@/lib/app-error-log";
 import { notifyAdmins, notifyClientUsersByEmail } from "@/lib/realtime";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);

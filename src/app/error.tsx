@@ -4,6 +4,7 @@ import * as React from "react";
 import { AlertTriangle, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { attemptChunkReload, isChunkLoadError } from "@/lib/chunk-recovery";
 
 async function logRenderError(error: Error) {
   try {
@@ -38,9 +39,23 @@ export default function GlobalAppError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const isChunkError = isChunkLoadError(error);
+  const [autoRecovering, setAutoRecovering] = React.useState(false);
+
   React.useEffect(() => {
     void logRenderError(error);
   }, [error]);
+
+  React.useEffect(() => {
+    if (!isChunkError) {
+      return;
+    }
+
+    const didReload = attemptChunkReload();
+    if (didReload) {
+      setAutoRecovering(true);
+    }
+  }, [isChunkError]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6 py-16">
@@ -52,25 +67,38 @@ export default function GlobalAppError({
           <div className="space-y-3">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-red-600">
-                Something went wrong
+                {isChunkError ? "App update detected" : "Something went wrong"}
               </p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
-                We logged this error for review.
+                {isChunkError ? "We’re refreshing the app." : "We logged this error for review."}
               </h1>
             </div>
             <p className="text-sm leading-6 text-slate-600">
-              The page hit an unexpected problem. You can retry now, and the issue is already available in the admin
-              error log for audit and follow-up.
+              {isChunkError
+                ? "A fresh deploy changed one of the app bundles. Doomple is trying a clean reload so you land on the latest version."
+                : "The page hit an unexpected problem. You can retry now, and the issue is already available in the admin error log for audit and follow-up."}
             </p>
             <div className="flex flex-wrap gap-3 pt-2">
-              <Button onClick={() => reset()}>
+              <Button
+                onClick={() => {
+                  if (isChunkError) {
+                    window.location.reload();
+                    return;
+                  }
+
+                  reset();
+                }}
+              >
                 <RefreshCcw className="mr-2 h-4 w-4" />
-                Try again
+                {isChunkError ? "Reload app" : "Try again"}
               </Button>
               <Button variant="outline" onClick={() => window.location.assign("/")}>
                 Go home
               </Button>
             </div>
+            {autoRecovering ? (
+              <p className="text-xs font-medium text-slate-500">Refreshing now...</p>
+            ) : null}
           </div>
         </div>
       </Card>

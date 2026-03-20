@@ -110,6 +110,7 @@ export async function POST(request: Request) {
             type: "PAYMENT",
             link: `/admin/invoices/${invoice.id}`,
             topics: ["dashboard", "invoices", "payments", "notifications"],
+            email: true,
             metadata: {
               invoiceId: invoice.id,
               paymentId,

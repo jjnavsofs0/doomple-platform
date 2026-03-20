@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -22,6 +22,8 @@ import { signOut, useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { DoompleLogo } from "@/components/ui/doomple-logo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ADMIN_GLOBAL_CHANNEL } from "@/lib/realtime";
+import { useRealtimeSubscription } from "@/hooks/use-realtime-subscription";
 
 interface AdminSidebarProps {
   className?: string;
@@ -120,10 +122,12 @@ const roleLabels: Record<string, string> = {
 
 export function AdminSidebar({ className }: AdminSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [openErrorCount, setOpenErrorCount] = useState(0);
   const pathname = usePathname();
   const { data: session } = useSession();
 
   const role = (session?.user as { role?: string })?.role || "";
+  const canViewErrors = role === "SUPER_ADMIN" || role === "ADMIN";
 
   const filteredGroups = navGroups
     .map((group) => ({
@@ -145,6 +149,39 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
         .toUpperCase()
         .slice(0, 2)
     : "A";
+
+  const fetchSidebarCounts = useCallback(async () => {
+    if (!session?.user?.id || !canViewErrors) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/error-logs?status=open&limit=1", {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const result = await response.json();
+      setOpenErrorCount(Number(result?.summary?.openCount || 0));
+    } catch {
+      // Keep the shell resilient even if the counters cannot be loaded.
+    }
+  }, [canViewErrors, session?.user?.id]);
+
+  useEffect(() => {
+    void fetchSidebarCounts();
+  }, [fetchSidebarCounts]);
+
+  useRealtimeSubscription({
+    channelName: session?.user?.id && canViewErrors ? ADMIN_GLOBAL_CHANNEL : null,
+    topics: ["errors", "notifications", "dashboard", "payments", "leads"],
+    onEvent: () => {
+      void fetchSidebarCounts();
+    },
+  });
 
   return (
     <aside
@@ -195,6 +232,7 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
                 {group.items.map((item) => {
                   const Icon = item.icon;
                   const active = isActive(item.href);
+                  const badgeCount = item.href === "/admin/errors" ? openErrorCount : 0;
 
                   return (
                     <Link
@@ -221,11 +259,28 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
                           <span className={cn("tracking-[0.01em]", active ? "text-white" : "text-inherit")}>
                             {item.label}
                           </span>
-                          {active && (
-                            <span className="ml-auto h-2 w-2 rounded-full bg-[#34D3C3]" />
-                          )}
+                          <div className="ml-auto flex items-center gap-2">
+                            {badgeCount > 0 ? (
+                              <span
+                                className={cn(
+                                  "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                                  active
+                                    ? "bg-[#34D3C3]/20 text-[#9AF6EA]"
+                                    : "bg-white/10 text-white/90"
+                                )}
+                              >
+                                {badgeCount > 99 ? "99+" : badgeCount}
+                              </span>
+                            ) : null}
+                            {active && (
+                              <span className="h-2 w-2 rounded-full bg-[#34D3C3]" />
+                            )}
+                          </div>
                         </>
                       )}
+                      {isCollapsed && badgeCount > 0 ? (
+                        <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[#34D3C3]" />
+                      ) : null}
                     </Link>
                   );
                 })}

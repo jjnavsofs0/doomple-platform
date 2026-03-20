@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import type { Prisma } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
+import { getClientCoreSelect, supportsClientBankingFields } from "@/lib/client-db-compat";
 import { prisma } from "@/lib/prisma";
 import { notifyAdmins } from "@/lib/realtime";
 import { clientSchema } from "@/lib/validations";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
@@ -18,6 +22,7 @@ export async function GET(request: Request) {
     const limit = parseInt(url.searchParams.get("limit") || "10");
 
     const skip = (page - 1) * limit;
+    const clientSelect = getClientCoreSelect(false);
 
     const where: any = {};
     if (search) {
@@ -30,7 +35,8 @@ export async function GET(request: Request) {
 
     const clients = await prisma.client.findMany({
       where,
-      include: {
+      select: {
+        ...clientSelect,
         _count: {
           select: {
             projects: true,
@@ -47,6 +53,10 @@ export async function GET(request: Request) {
 
     const data = clients.map((client) => ({
       ...client,
+      panNumber: null,
+      bankName: null,
+      bankAccountNumber: null,
+      ifscCode: null,
       contactPersonName: client.contactName,
       status: client.isActive ? "active" : "inactive",
       projects_count: client._count.projects,
@@ -78,6 +88,8 @@ export async function POST(request: Request) {
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const bankingFieldsSupported = await supportsClientBankingFields();
 
     const body = await request.json();
     const normalizedData = {
@@ -120,6 +132,7 @@ export async function POST(request: Request) {
     // Check if email already exists
     const existingClient = await prisma.client.findUnique({
       where: { email: validatedData.email },
+      select: { id: true },
     });
 
     if (existingClient) {
@@ -129,25 +142,30 @@ export async function POST(request: Request) {
       );
     }
 
+    const clientData: Prisma.ClientCreateInput = {
+      type: body.type || "company",
+      companyName: validatedData.company,
+      contactName: validatedData.name,
+      email: validatedData.email,
+      phone: validatedData.phone || null,
+      billingAddress: validatedData.address || null,
+      city: validatedData.city || null,
+      state: validatedData.state || null,
+      postalCode: validatedData.zipCode || null,
+      country: validatedData.country || null,
+      gstNumber: validatedData.gstin || null,
+      isActive: true,
+    };
+
+    if (bankingFieldsSupported) {
+      clientData.panNumber = normalizedData.panNumber || null;
+      clientData.bankName = normalizedData.bankName || null;
+      clientData.bankAccountNumber = normalizedData.bankAccountNumber || null;
+      clientData.ifscCode = normalizedData.ifscCode || null;
+    }
+
     const client = await prisma.client.create({
-      data: {
-        type: body.type || "company",
-        companyName: validatedData.company,
-        contactName: validatedData.name,
-        email: validatedData.email,
-        phone: validatedData.phone || null,
-        billingAddress: validatedData.address || null,
-        city: validatedData.city || null,
-        state: validatedData.state || null,
-        postalCode: validatedData.zipCode || null,
-        country: validatedData.country || null,
-        gstNumber: validatedData.gstin || null,
-        panNumber: normalizedData.panNumber || null,
-        bankName: normalizedData.bankName || null,
-        bankAccountNumber: normalizedData.bankAccountNumber || null,
-        ifscCode: normalizedData.ifscCode || null,
-        isActive: true,
-      },
+      data: clientData,
     });
 
     await notifyAdmins({

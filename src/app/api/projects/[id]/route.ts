@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import type { BillingModel, ProjectCategory, ProjectStatus } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { normalizeCurrency } from "@/lib/billing";
+import { getProjectCoreSelect, supportsProjectCurrencyField } from "@/lib/project-db-compat";
 import { prisma } from "@/lib/prisma";
 import { notifyAdmins, notifyClientUsersByEmail, notifyUserById } from "@/lib/realtime";
 
@@ -69,6 +70,8 @@ const normalizeProjectStatus = (
   return fallback;
 };
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -78,10 +81,12 @@ export async function GET(
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const projectCurrencySupported = await supportsProjectCurrencyField();
 
     const project = await prisma.project.findUnique({
       where: { id: params.id },
-      include: {
+      select: {
+        ...getProjectCoreSelect(projectCurrencySupported),
         client: {
           select: {
             id: true,
@@ -148,7 +153,7 @@ export async function GET(
         managerName: project.manager?.name || "Unassigned",
         progress: project.progressPercent,
         budget: Number(project.budget || 0),
-        currency: project.currency || "INR",
+        currency: "currency" in project ? project.currency || "INR" : "INR",
         institutionType: project.uepDetail?.institutionType || null,
         selectedModules: project.uepDetail?.selectedModules || [],
         customizationScope: project.uepDetail?.customizationScope || null,
@@ -178,11 +183,13 @@ export async function PUT(
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const projectCurrencySupported = await supportsProjectCurrencyField();
 
     const body = await request.json();
 
     const existingProject = await prisma.project.findUnique({
       where: { id: params.id },
+      select: getProjectCoreSelect(projectCurrencySupported),
     });
 
     if (!existingProject) {
@@ -192,42 +199,49 @@ export async function PUT(
       );
     }
 
+    const updateData: Record<string, unknown> = {
+      name: body.name || existingProject.name,
+      description:
+        body.description !== undefined
+          ? body.description
+          : existingProject.description,
+      scope: body.scope !== undefined ? body.scope : existingProject.scope,
+      category: normalizeProjectCategory(body.category, existingProject.category),
+      status: normalizeProjectStatus(body.status, existingProject.status),
+      priority: body.priority || existingProject.priority,
+      budget:
+        body.budget !== undefined
+          ? Number(body.budget)
+          : existingProject.budget,
+      billingModel: normalizeBillingModel(body.billingModel, existingProject.billingModel),
+      progressPercent:
+        body.progressPercent !== undefined
+          ? body.progressPercent
+          : existingProject.progressPercent,
+      startDate: body.startDate
+        ? new Date(body.startDate)
+        : existingProject.startDate,
+      estimatedEndDate: body.estimatedEndDate
+        ? new Date(body.estimatedEndDate)
+        : existingProject.estimatedEndDate,
+      managerId:
+        body.managerId !== undefined
+          ? body.managerId
+          : existingProject.managerId,
+    };
+
+    if (projectCurrencySupported) {
+      updateData.currency =
+        body.currency !== undefined
+          ? normalizeCurrency(body.currency)
+          : "currency" in existingProject
+            ? existingProject.currency
+            : "INR";
+    }
+
     const updatedProject = await prisma.project.update({
       where: { id: params.id },
-      data: {
-        name: body.name || existingProject.name,
-        currency:
-          body.currency !== undefined
-            ? normalizeCurrency(body.currency)
-            : existingProject.currency,
-        description:
-          body.description !== undefined
-            ? body.description
-            : existingProject.description,
-        scope: body.scope !== undefined ? body.scope : existingProject.scope,
-        category: normalizeProjectCategory(body.category, existingProject.category),
-        status: normalizeProjectStatus(body.status, existingProject.status),
-        priority: body.priority || existingProject.priority,
-        budget:
-          body.budget !== undefined
-            ? Number(body.budget)
-            : existingProject.budget,
-        billingModel: normalizeBillingModel(body.billingModel, existingProject.billingModel),
-        progressPercent:
-          body.progressPercent !== undefined
-            ? body.progressPercent
-            : existingProject.progressPercent,
-        startDate: body.startDate
-          ? new Date(body.startDate)
-          : existingProject.startDate,
-        estimatedEndDate: body.estimatedEndDate
-          ? new Date(body.estimatedEndDate)
-          : existingProject.estimatedEndDate,
-        managerId:
-          body.managerId !== undefined
-            ? body.managerId
-            : existingProject.managerId,
-      },
+      data: updateData,
       include: {
         client: {
           select: {

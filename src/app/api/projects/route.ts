@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import type { BillingModel, ProjectCategory } from "@prisma/client";
+import type { BillingModel, Prisma, ProjectCategory } from "@prisma/client";
 import { authOptions } from "@/lib/auth";
 import { normalizeCurrency } from "@/lib/billing";
+import { getProjectCoreSelect, supportsProjectCurrencyField } from "@/lib/project-db-compat";
 import { prisma } from "@/lib/prisma";
 import { notifyAdmins, notifyClientUsersByEmail, notifyUserById } from "@/lib/realtime";
 import { projectSchema } from "@/lib/validations";
@@ -49,6 +50,8 @@ const normalizeBillingModel = (billingModel?: string): BillingModel => {
   return "FIXED_PRICE";
 };
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -66,6 +69,7 @@ export async function GET(request: Request) {
     const limit = parseInt(url.searchParams.get("limit") || "10");
 
     const skip = (page - 1) * limit;
+    const projectCurrencySupported = await supportsProjectCurrencyField();
 
     const where: any = {};
     if (status) where.status = status;
@@ -81,7 +85,8 @@ export async function GET(request: Request) {
 
     const projects = await prisma.project.findMany({
       where,
-      include: {
+      select: {
+        ...getProjectCoreSelect(projectCurrencySupported),
         client: {
           select: {
             id: true,
@@ -110,7 +115,7 @@ export async function GET(request: Request) {
       managerName: project.manager?.name || "Unassigned",
       progress: project.progressPercent,
       budget: Number(project.budget || 0),
-      currency: project.currency || "INR",
+      currency: "currency" in project ? project.currency || "INR" : "INR",
     }));
 
     return NextResponse.json({
@@ -140,6 +145,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
+    const projectCurrencySupported = await supportsProjectCurrencyField();
     const normalizedData = {
       name: body.name || "",
       description: body.description || "",
@@ -178,6 +184,7 @@ export async function POST(request: Request) {
     // Check if client exists
     const clientExists = await prisma.client.findUnique({
       where: { id: normalizedData.clientId },
+      select: { id: true, email: true },
     });
 
     if (!clientExists) {
@@ -187,24 +194,22 @@ export async function POST(request: Request) {
       );
     }
 
-    const project = await prisma.project.create({
-      data: {
-        name: normalizedData.name,
-        currency: normalizedData.currency,
-        category: normalizedData.category,
-        description: normalizedData.description || null,
-        scope: normalizedData.scope || null,
-        clientId: normalizedData.clientId,
-        leadId: body.leadId || null,
-        managerId: normalizedData.managerId || null,
-        status: "DRAFT",
-        priority: normalizedData.priority,
-        budget: normalizedData.budget ?? null,
-        billingModel: normalizedData.billingModel,
-        startDate: normalizedData.startDate ? new Date(normalizedData.startDate) : null,
-        estimatedEndDate: normalizedData.estimatedEndDate
-          ? new Date(normalizedData.estimatedEndDate)
-          : null,
+    const projectData: any = {
+      name: normalizedData.name,
+      category: normalizedData.category,
+      description: normalizedData.description || null,
+      scope: normalizedData.scope || null,
+      clientId: normalizedData.clientId,
+      leadId: body.leadId || null,
+      managerId: normalizedData.managerId || null,
+      status: "DRAFT",
+      priority: normalizedData.priority,
+      budget: normalizedData.budget ?? null,
+      billingModel: normalizedData.billingModel,
+      startDate: normalizedData.startDate ? new Date(normalizedData.startDate) : null,
+      estimatedEndDate: normalizedData.estimatedEndDate
+        ? new Date(normalizedData.estimatedEndDate)
+        : null,
         ...(normalizedData.category === "UEP_IMPLEMENTATION"
           ? {
               uepDetail: {
@@ -237,7 +242,14 @@ export async function POST(request: Request) {
               },
             }
           : {}),
-      },
+    };
+
+    if (projectCurrencySupported) {
+      projectData.currency = normalizedData.currency;
+    }
+
+    const project = await prisma.project.create({
+      data: projectData as Prisma.ProjectUncheckedCreateInput,
       include: {
         client: {
           select: {

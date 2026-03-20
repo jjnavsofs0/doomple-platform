@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { notifyAdmins, notifyUserById } from "@/lib/realtime";
 import { leadSchema } from "@/lib/validations";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -168,6 +170,7 @@ export async function POST(request: Request) {
       type: "LEAD",
       link: `/admin/leads/${lead.id}`,
       topics: ["dashboard", "leads", "notifications"],
+      email: true,
       metadata: {
         leadId: lead.id,
         status: lead.status,
