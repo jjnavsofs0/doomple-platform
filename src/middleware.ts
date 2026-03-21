@@ -10,6 +10,8 @@ const ROLE_RESTRICTED_ROUTES: { prefix: string; allowedRoles: string[] }[] = [
   // Users management — Super Admin only
   { prefix: "/admin/users",    allowedRoles: ["SUPER_ADMIN"] },
   { prefix: "/admin/errors", allowedRoles: ["SUPER_ADMIN", "ADMIN"] },
+  { prefix: "/admin/chatbot", allowedRoles: ["SUPER_ADMIN", "ADMIN", "SALES", "PROJECT_MANAGER"] },
+  { prefix: "/admin/tickets", allowedRoles: ["SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "SALES"] },
   // Settings — Super Admin + Admin
   { prefix: "/admin/settings", allowedRoles: ["SUPER_ADMIN", "ADMIN"] },
   // Payments — Super Admin, Admin, Finance
@@ -50,6 +52,7 @@ const PUBLIC_API_ROUTES = [
   "/api/error-logs",
   "/api/contact",
   "/api/razorpay/webhook",
+  "/api/chatbot",
 ];
 
 export async function middleware(request: NextRequest) {

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   AlertTriangle,
+  Bot,
   Briefcase,
   Building2,
   ChevronLeft,
@@ -12,6 +13,7 @@ import {
   CreditCard,
   FileText,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   Receipt,
   Settings,
@@ -86,6 +88,12 @@ const navGroups = [
         icon: Briefcase,
         roles: ["SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "SALES"],
       },
+      {
+        label: "Tickets",
+        href: "/admin/tickets",
+        icon: LifeBuoy,
+        roles: ["SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "SALES"],
+      },
     ],
   },
   {
@@ -96,6 +104,12 @@ const navGroups = [
         href: "/admin/errors",
         icon: AlertTriangle,
         roles: ["SUPER_ADMIN", "ADMIN"],
+      },
+      {
+        label: "Chatbot",
+        href: "/admin/chatbot",
+        icon: Bot,
+        roles: ["SUPER_ADMIN", "ADMIN", "SALES", "PROJECT_MANAGER"],
       },
       {
         label: "Users",

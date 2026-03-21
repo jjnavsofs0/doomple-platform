@@ -169,6 +169,60 @@ enum AppErrorSource {
   RENDER
 }
 
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_CLIENT
+  RESOLVED
+  CLOSED
+}
+
+enum SupportTicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SupportTicketSource {
+  CHATBOT
+  PORTAL
+  EMAIL
+  PHONE
+  MANUAL
+}
+
+enum ChatbotConversationStatus {
+  ACTIVE
+  LEAD_CAPTURED
+  SUPPORT_CAPTURED
+  VERIFIED_CUSTOMER
+  CLOSED
+}
+
+enum ChatbotIntent {
+  GENERAL
+  SALES
+  SUPPORT
+}
+
+enum ChatbotMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum ChatbotKnowledgeDocumentType {
+  TEXT
+  FILE
+}
+
+enum ChatbotKnowledgeDocumentStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
 // ========== MODELS ==========
 
 model User {
@@ -209,6 +263,7 @@ model User {
   cookieConsents            CookieConsentRecord[]
   appErrorLogs              AppErrorLog[]          @relation("AppErrorActor")
   resolvedAppErrorLogs      AppErrorLog[]          @relation("AppErrorResolvedBy")
+  chatbotKnowledgeDocuments ChatbotKnowledgeDocument[]
 
   @@index([email])
   @@index([role])
@@ -353,6 +408,7 @@ model Lead {
   activities          LeadActivity[]
   quotations          Quotation[]
   projects            Project[]     @relation("ProjectLead")
+  chatbotConversations ChatbotConversation[]
 
   @@index([email])
   @@index([status])
@@ -428,6 +484,8 @@ model Client {
   invoices      Invoice[]
   quotations    Quotation[]
   convertedFromLeads Lead[]
+  supportTickets SupportTicket[]
+  chatbotConversations ChatbotConversation[]
 
   @@index([email])
   @@index([type])
@@ -943,4 +1001,138 @@ model FileAttachment {
   @@index([entityType])
   @@index([entityId])
   @@index([uploadedById])
+}
+
+model SupportTicket {
+  id             String                @id @default(cuid())
+  ticketNumber   String                @unique
+  subject        String
+  description    String                @db.Text
+  status         SupportTicketStatus   @default(OPEN)
+  priority       SupportTicketPriority @default(MEDIUM)
+  source         SupportTicketSource   @default(CHATBOT)
+  requesterName  String
+  requesterEmail String
+  requesterPhone String?
+  companyName    String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  resolvedAt     DateTime?
+
+  clientId       String?
+  client         Client?               @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  conversationId String?               @unique
+  conversation   ChatbotConversation?  @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([ticketNumber])
+  @@index([status])
+  @@index([priority])
+  @@index([requesterEmail])
+  @@index([clientId])
+  @@index([createdAt])
+}
+
+model ChatbotConversation {
+  id                  String                     @id @default(cuid())
+  visitorId           String
+  status              ChatbotConversationStatus  @default(ACTIVE)
+  intent              ChatbotIntent              @default(GENERAL)
+  visitorName         String?
+  visitorEmail        String?
+  visitorPhone        String?
+  companyName         String?
+  summary             String?                    @db.Text
+  isCustomerVerified  Boolean                    @default(false)
+  verifiedAt          DateTime?
+  lastMessageAt       DateTime                   @default(now())
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  clientId            String?
+  client              Client?                    @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  leadId              String?
+  lead                Lead?                      @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  supportTicket       SupportTicket?
+  messages            ChatbotMessage[]
+  otpRequests         ChatbotOtpRequest[]
+
+  @@index([visitorId])
+  @@index([status])
+  @@index([intent])
+  @@index([visitorEmail])
+  @@index([clientId])
+  @@index([leadId])
+  @@index([lastMessageAt])
+  @@index([createdAt])
+}
+
+model ChatbotMessage {
+  id             String             @id @default(cuid())
+  role           ChatbotMessageRole
+  content        String             @db.Text
+  metadata       Json?
+  createdAt      DateTime           @default(now())
+
+  conversationId String
+  conversation   ChatbotConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+model ChatbotOtpRequest {
+  id             String             @id @default(cuid())
+  email          String
+  codeHash       String
+  expiresAt      DateTime
+  verifiedAt     DateTime?
+  attempts       Int                @default(0)
+  createdAt      DateTime           @default(now())
+
+  conversationId String
+  conversation   ChatbotConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([email])
+  @@index([expiresAt])
+}
+
+model ChatbotKnowledgeDocument {
+  id               String                        @id @default(cuid())
+  title            String
+  slug             String                        @unique
+  type             ChatbotKnowledgeDocumentType
+  status           ChatbotKnowledgeDocumentStatus @default(PROCESSING)
+  rawText          String?                       @db.Text
+  excerpt          String?                       @db.Text
+  url              String?
+  storageKey       String?
+  storageProvider  String?
+  mimeType         String?
+  size             Int?
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
+
+  uploadedById     String?
+  uploadedBy       User?                         @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  chunks           ChatbotKnowledgeChunk[]
+
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  @@index([uploadedById])
+}
+
+model ChatbotKnowledgeChunk {
+  id          String                   @id @default(cuid())
+  content     String                   @db.Text
+  embedding   Json?
+  chunkIndex  Int
+  createdAt   DateTime                 @default(now())
+
+  documentId  String
+  document    ChatbotKnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([chunkIndex])
 }
