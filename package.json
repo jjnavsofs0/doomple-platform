@@ -7,11 +7,12 @@
   },
   "scripts": {
     "dev": "unset NODE_ENV && next dev",
-    "build": "unset NODE_ENV && prisma generate && prisma migrate deploy && next build",
+    "build": "unset NODE_ENV && prisma generate && next build",
     "start": "unset NODE_ENV && next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio",
     "db:setup": "prisma generate && prisma migrate dev && tsx prisma/seed.ts"

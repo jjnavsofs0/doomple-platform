@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Bot, FileText, MessageSquareMore, RefreshCcw, Upload } from "lucide-react";
+import { ArrowRight, Bot, Database, FileText, RefreshCcw, Upload } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
+import { formatDate } from "@/lib/utils";
 
 type ChatbotAdminData = {
   settings: {
@@ -14,32 +15,25 @@ type ChatbotAdminData = {
     salesObjective: string;
     supportObjective: string;
   };
+  vectorStore: {
+    id: string;
+    name: string;
+    status: string;
+    file_counts: {
+      completed: number;
+      failed: number;
+      in_progress: number;
+      total: number;
+    };
+  } | null;
   knowledgeDocuments: Array<{
     id: string;
     title: string;
     type: "TEXT" | "FILE";
     status: "PROCESSING" | "READY" | "FAILED";
     excerpt: string | null;
-    _count: { chunks: number };
+    openaiFilename: string | null;
     updatedAt: string;
-  }>;
-  conversations: Array<{
-    id: string;
-    visitorName: string | null;
-    visitorEmail: string | null;
-    status: string;
-    intent: string;
-    isCustomerVerified: boolean;
-    lastMessageAt: string;
-    lead: { id: string; fullName: string; status: string } | null;
-    supportTicket: { id: string; ticketNumber: string; status: string } | null;
-    messages: Array<{ content: string }>;
-  }>;
-  tickets: Array<{
-    id: string;
-    ticketNumber: string;
-    subject: string;
-    status: string;
   }>;
 };
 
@@ -54,6 +48,7 @@ const emptySettings = {
 
 export default function AdminChatbotPage() {
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -93,11 +88,9 @@ export default function AdminChatbotPage() {
   const stats = useMemo(() => {
     const documents = data?.knowledgeDocuments.length || 0;
     const readyDocuments = data?.knowledgeDocuments.filter((item) => item.status === "READY").length || 0;
-    const openTickets =
-      data?.tickets.filter((ticket) => ticket.status !== "RESOLVED" && ticket.status !== "CLOSED")
-        .length || 0;
+    const vectorFiles = data?.vectorStore?.file_counts.completed || 0;
 
-    return { documents, readyDocuments, openTickets };
+    return { documents, readyDocuments, vectorFiles };
   }, [data]);
 
   async function saveSettings() {
@@ -155,7 +148,7 @@ export default function AdminChatbotPage() {
       setTextBody("");
       toast({
         title: "Knowledge text added",
-        description: "The chatbot can use this text in future conversations.",
+        description: "The vector store is being refreshed with this content.",
       });
       await load();
     } catch (error) {
@@ -191,9 +184,12 @@ export default function AdminChatbotPage() {
 
       setFileTitle("");
       setFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       toast({
         title: "Knowledge document uploaded",
-        description: "The document was ingested for chatbot retrieval.",
+        description: "The document is now syncing into the OpenAI vector store.",
       });
       await load();
     } catch (error) {
@@ -230,25 +226,34 @@ export default function AdminChatbotPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-[28px] border border-[#D9E5F2] bg-white px-6 py-6 shadow-[0_20px_60px_-40px_rgba(7,34,63,0.45)]">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#1ABFAD]">AI Assistant</p>
-            <h1 className="mt-3 text-3xl font-bold text-[#042042]">OpenAI chatbot control room</h1>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              Manage how the assistant sells Doomple services, verifies existing customers, and
-              uses your knowledge base to capture leads or support tickets.
+    <div className="space-y-6 p-6 lg:p-8">
+      <section className="overflow-hidden rounded-[32px] border border-[#D9E5F2] bg-[radial-gradient(circle_at_top_left,_rgba(26,191,173,0.18),_transparent_32%),linear-gradient(135deg,#06203C_0%,#0A3158_100%)] px-6 py-7 text-white shadow-[0_25px_80px_-40px_rgba(7,34,63,0.65)]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-3xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#8FF3E7]">AI Assistant</p>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight">Chatbot control room</h1>
+            <p className="mt-3 text-sm leading-6 text-slate-200">
+              Tune the assistant voice, manage knowledge synced into OpenAI vector retrieval,
+              and hand operational follow-up to the new conversations workspace.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700"
-          >
-            <RefreshCcw className="h-4 w-4" />
-            Refresh
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/admin/conversations"
+              className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-medium text-[#07223F]"
+            >
+              Manage conversations
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-medium text-white"
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Refresh
+            </button>
+          </div>
         </div>
       </section>
 
@@ -256,7 +261,7 @@ export default function AdminChatbotPage() {
         {[
           { label: "Knowledge docs", value: stats.documents, icon: FileText },
           { label: "Ready for retrieval", value: stats.readyDocuments, icon: Bot },
-          { label: "Open tickets", value: stats.openTickets, icon: MessageSquareMore },
+          { label: "Vector store files", value: stats.vectorFiles, icon: Database },
         ].map((item) => {
           const Icon = item.icon;
           return (
@@ -271,7 +276,7 @@ export default function AdminChatbotPage() {
         })}
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+      <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="rounded-[28px] border border-[#D9E5F2] bg-white p-6">
           <h2 className="text-xl font-semibold text-[#042042]">Assistant settings</h2>
           <div className="mt-5 grid gap-4">
@@ -340,6 +345,33 @@ export default function AdminChatbotPage() {
 
         <div className="space-y-6">
           <div className="rounded-[28px] border border-[#D9E5F2] bg-white p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-[#042042]">OpenAI vector store</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  All chatbot retrieval now runs through OpenAI vector store search instead of local chunk ranking.
+                </p>
+              </div>
+              <Database className="h-6 w-6 text-[#1ABFAD]" />
+            </div>
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-[#F8FBFF] px-4 py-4">
+              {data?.vectorStore ? (
+                <>
+                  <p className="font-semibold text-[#042042]">{data.vectorStore.name}</p>
+                  <p className="mt-1 text-sm text-slate-500">Store ID: {data.vectorStore.id}</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Status: {data.vectorStore.status} · {data.vectorStore.file_counts.completed} files ready
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  The vector store will be created automatically the first time a knowledge document is synced.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-[#D9E5F2] bg-white p-6">
             <h2 className="text-xl font-semibold text-[#042042]">Add text knowledge</h2>
             <div className="mt-5 grid gap-4">
               <input
@@ -377,6 +409,7 @@ export default function AdminChatbotPage() {
               />
               <input
                 type="file"
+                ref={fileInputRef}
                 onChange={(event) => setFile(event.target.files?.[0] || null)}
                 className="rounded-2xl border border-slate-200 px-4 py-3"
               />
@@ -394,106 +427,57 @@ export default function AdminChatbotPage() {
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="rounded-[28px] border border-[#D9E5F2] bg-white p-6">
-          <h2 className="text-xl font-semibold text-[#042042]">Knowledge base</h2>
-          <div className="mt-5 space-y-3">
-            {loading ? (
-              <p className="text-sm text-slate-500">Loading knowledge documents...</p>
-            ) : data?.knowledgeDocuments.length ? (
-              data.knowledgeDocuments.map((document) => (
-                <div key={document.id} className="rounded-2xl border border-slate-200 px-4 py-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-[#042042]">{document.title}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">
-                        {document.type} · {document.status} · {document._count.chunks} chunks
-                      </p>
-                      {document.excerpt ? (
-                        <p className="mt-3 text-sm leading-6 text-slate-600">{document.excerpt}</p>
-                      ) : null}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void deleteDocument(document.id)}
-                      className="text-sm font-medium text-red-600"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-slate-500">No chatbot knowledge has been added yet.</p>
-            )}
+      <section className="rounded-[28px] border border-[#D9E5F2] bg-white p-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-[#042042]">Knowledge library</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Documents below are the source of truth for retrieval. Editing or deleting them will resync the vector store.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/admin/conversations" className="rounded-full border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700">
+              Open conversations
+            </Link>
+            <Link href="/admin/tickets" className="rounded-full border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700">
+              Open tickets
+            </Link>
           </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="rounded-[28px] border border-[#D9E5F2] bg-white p-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-[#042042]">Recent conversations</h2>
-              <span className="text-sm text-slate-500">{data?.conversations.length || 0}</span>
-            </div>
-            <div className="mt-5 space-y-3">
-              {data?.conversations.length ? (
-                data.conversations.map((conversation) => (
-                  <div key={conversation.id} className="rounded-2xl border border-slate-200 px-4 py-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="font-semibold text-[#042042]">
-                          {conversation.visitorName || conversation.visitorEmail || "Anonymous visitor"}
-                        </p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">
-                          {conversation.intent} · {conversation.status}
-                        </p>
-                      </div>
-                      {conversation.supportTicket ? (
-                        <Link href={`/admin/tickets/${conversation.supportTicket.id}`} className="text-sm font-medium text-[#0E7A6D]">
-                          {conversation.supportTicket.ticketNumber}
-                        </Link>
-                      ) : conversation.lead ? (
-                        <Link href={`/admin/leads/${conversation.lead.id}`} className="text-sm font-medium text-[#0E7A6D]">
-                          Open lead
-                        </Link>
-                      ) : null}
-                    </div>
-                    {conversation.messages[0]?.content ? (
-                      <p className="mt-3 text-sm leading-6 text-slate-600">{conversation.messages[0].content}</p>
+        <div className="mt-6 space-y-3">
+          {loading ? (
+            <p className="text-sm text-slate-500">Loading knowledge documents...</p>
+          ) : data?.knowledgeDocuments.length ? (
+            data.knowledgeDocuments.map((document) => (
+              <div key={document.id} className="rounded-2xl border border-slate-200 px-4 py-4">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-[#042042]">{document.title}</p>
+                    <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">
+                      {document.type} · {document.status}
+                      {document.openaiFilename ? ` · ${document.openaiFilename}` : ""}
+                    </p>
+                    {document.excerpt ? (
+                      <p className="mt-3 text-sm leading-6 text-slate-600">{document.excerpt}</p>
                     ) : null}
+                    <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-400">
+                      Updated {formatDate(document.updatedAt, "MMM d, yyyy h:mm a")}
+                    </p>
                   </div>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">No chatbot conversations yet.</p>
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-[28px] border border-[#D9E5F2] bg-white p-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-[#042042]">Support tickets</h2>
-              <Link href="/admin/tickets" className="text-sm font-medium text-[#0E7A6D]">
-                View all
-              </Link>
-            </div>
-            <div className="mt-5 space-y-3">
-              {data?.tickets.length ? (
-                data.tickets.slice(0, 5).map((ticket) => (
-                  <Link
-                    key={ticket.id}
-                    href={`/admin/tickets/${ticket.id}`}
-                    className="block rounded-2xl border border-slate-200 px-4 py-4"
+                  <button
+                    type="button"
+                    onClick={() => void deleteDocument(document.id)}
+                    className="text-sm font-medium text-red-600"
                   >
-                    <p className="font-semibold text-[#042042]">{ticket.ticketNumber}</p>
-                    <p className="mt-1 text-sm text-slate-600">{ticket.subject}</p>
-                    <p className="mt-2 text-xs uppercase tracking-[0.18em] text-slate-400">{ticket.status}</p>
-                  </Link>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">No support tickets captured yet.</p>
-              )}
-            </div>
-          </div>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-slate-500">No chatbot knowledge has been added yet.</p>
+          )}
         </div>
       </section>
     </div>

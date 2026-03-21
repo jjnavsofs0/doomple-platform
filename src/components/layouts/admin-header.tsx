@@ -26,6 +26,7 @@ const pageTitleMap: Array<{ match: RegExp; title: string; kicker: string }> = [
   { match: /^\/admin\/invoices/, title: "Invoices", kicker: "Billing" },
   { match: /^\/admin\/payments/, title: "Payments", kicker: "Collections" },
   { match: /^\/admin\/tickets/, title: "Support Tickets", kicker: "Support" },
+  { match: /^\/admin\/conversations/, title: "Conversations", kicker: "Chatbot" },
   { match: /^\/admin\/chatbot/, title: "Chatbot", kicker: "AI Assistant" },
   { match: /^\/admin\/users/, title: "Users", kicker: "Access" },
   { match: /^\/admin\/settings/, title: "Settings", kicker: "System" },

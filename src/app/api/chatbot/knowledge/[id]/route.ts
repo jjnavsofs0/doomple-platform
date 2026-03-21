@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/admin-auth";
-import { indexKnowledgeDocument } from "@/lib/chatbot-kb";
+import { indexKnowledgeDocument, removeKnowledgeDocumentFromVectorStore } from "@/lib/chatbot-kb";
 import { prisma } from "@/lib/prisma";
 import { deleteStoredFile } from "@/lib/storage";
 
@@ -87,6 +87,7 @@ export async function DELETE(
       );
     }
 
+    await removeKnowledgeDocumentFromVectorStore(id);
     await prisma.chatbotKnowledgeDocument.delete({
       where: { id },
     });

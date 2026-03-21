@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { handleChatbotMessage } from "@/lib/chatbot";
+import { getVisitorChatbotConversations, handleChatbotMessage } from "@/lib/chatbot";
 import { generateId } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -28,10 +28,14 @@ export async function POST(request: Request) {
       visitorId,
       message,
     });
+    const conversations = await getVisitorChatbotConversations(visitorId);
 
     const response = NextResponse.json({
       success: true,
-      data: result,
+      data: {
+        ...result,
+        conversations,
+      },
     });
 
     response.cookies.set(CHATBOT_VISITOR_COOKIE, visitorId, {

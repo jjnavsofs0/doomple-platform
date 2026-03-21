@@ -1,21 +1,22 @@
 import { createHash, randomInt } from "crypto";
 import type { ChatbotIntent, LeadCategory, LeadPriority, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getKnowledgeContext } from "@/lib/chatbot-kb";
+import { getChatbotVectorStore, getKnowledgeContext } from "@/lib/chatbot-kb";
 import { sendTransactionalEmail } from "@/lib/email";
 import { getOpenAIChatModel, getOpenAIClient, isOpenAIConfigured } from "@/lib/openai";
 import { notifyAdmins } from "@/lib/realtime";
 import { recordAuditLog } from "@/lib/audit-log";
+import { truncate } from "@/lib/utils";
 
 const DEFAULT_CHATBOT_SETTINGS = {
   enabled: true,
   assistantName: "Doomple AI Advisor",
   welcomeMessage:
-    "Hi, welcome to Doomple. I can help you explore the right service or solution, answer questions, and guide you step by step if you'd like a proposal or callback.",
+    "Hi, welcome to Doomple. Tell me a bit about what you're looking to build or improve, and I'll help you figure out the right next step.",
   systemPrompt:
-    "You are Doomple's sales and support assistant. Be tactful, commercially sharp, concise, and trustworthy. Sound like a thoughtful business consultant, not a form. Answer the visitor's question first, give helpful direction, and then move the conversation forward naturally. Help visitors understand relevant services or solutions, move sales conversations toward lead capture, and handle support issues calmly. Never invent pricing, implementation guarantees, or product claims not present in the provided knowledge context.",
+    "You are Doomple's sales and support assistant. Be tactful, commercially sharp, concise, and trustworthy. Sound like a thoughtful business consultant, not a form. Keep replies short and easy to answer, usually 2 to 4 sentences unless the visitor asks for more detail. Answer the visitor's question first, give helpful direction, and then move the conversation forward naturally. Help visitors understand relevant services or solutions, move sales conversations toward lead capture in phases, and handle support issues calmly. Never invent pricing, implementation guarantees, or product claims not present in the provided knowledge context.",
   salesObjective:
-    "Qualify visitors, identify the best Doomple service or solution, and collect enough detail to create a strong lead for the sales team without making the conversation feel like a long intake form.",
+    "Qualify visitors, identify the best Doomple service or solution, and collect enough detail to create a strong lead for the sales team without making the conversation feel like a long intake form. Gather details in phased, low-friction steps.",
   supportObjective:
     "If the visitor is an existing customer with an issue, identify them via email and OTP, then capture a support ticket with a clear summary and urgency.",
 };
@@ -50,6 +51,15 @@ type AssistantOutput = {
   };
   missingFields?: string[];
 };
+
+function getNonEmptyString(value: unknown, fallback: string) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+  return trimmed ? trimmed : fallback;
+}
 
 function normalizeJsonText(value: string) {
   return value
@@ -109,10 +119,40 @@ function isOtpCode(value: string) {
   return /^\d{6}$/.test(value.trim());
 }
 
-function buildTicketNumber(sequence: number) {
+export function buildTicketNumber(sequence: number) {
   const now = new Date();
   const month = `${now.getMonth() + 1}`.padStart(2, "0");
   return `DTK-${now.getFullYear()}${month}-${String(sequence).padStart(3, "0")}`;
+}
+
+function getConversationTitle(params: {
+  summary?: string | null;
+  visitorName?: string | null;
+  visitorEmail?: string | null;
+  supportTicketNumber?: string | null;
+  latestMessage?: string | null;
+}) {
+  if (params.summary?.trim()) {
+    return truncate(params.summary.trim(), 48);
+  }
+
+  if (params.latestMessage?.trim()) {
+    return truncate(params.latestMessage.trim(), 48);
+  }
+
+  if (params.supportTicketNumber) {
+    return `Support ${params.supportTicketNumber}`;
+  }
+
+  if (params.visitorName?.trim()) {
+    return params.visitorName.trim();
+  }
+
+  if (params.visitorEmail?.trim()) {
+    return params.visitorEmail.trim();
+  }
+
+  return "New conversation";
 }
 
 export async function getChatbotSettings(): Promise<ChatbotSettings> {
@@ -120,9 +160,30 @@ export async function getChatbotSettings(): Promise<ChatbotSettings> {
     where: { key: "chatbot_assistant" },
   });
 
+  const value = (row?.value as Partial<ChatbotSettings> | null) || null;
+
   return {
-    ...DEFAULT_CHATBOT_SETTINGS,
-    ...(row?.value as Partial<ChatbotSettings> | null),
+    enabled: value?.enabled ?? DEFAULT_CHATBOT_SETTINGS.enabled,
+    assistantName: getNonEmptyString(
+      value?.assistantName,
+      DEFAULT_CHATBOT_SETTINGS.assistantName
+    ),
+    welcomeMessage: getNonEmptyString(
+      value?.welcomeMessage,
+      DEFAULT_CHATBOT_SETTINGS.welcomeMessage
+    ),
+    systemPrompt: getNonEmptyString(
+      value?.systemPrompt,
+      DEFAULT_CHATBOT_SETTINGS.systemPrompt
+    ),
+    salesObjective: getNonEmptyString(
+      value?.salesObjective,
+      DEFAULT_CHATBOT_SETTINGS.salesObjective
+    ),
+    supportObjective: getNonEmptyString(
+      value?.supportObjective,
+      DEFAULT_CHATBOT_SETTINGS.supportObjective
+    ),
   };
 }
 
@@ -131,8 +192,11 @@ export async function getOrCreateChatbotConversation(params: {
   visitorId: string;
 }) {
   if (params.conversationId) {
-    const existing = await prisma.chatbotConversation.findUnique({
-      where: { id: params.conversationId },
+    const existing = await prisma.chatbotConversation.findFirst({
+      where: {
+        id: params.conversationId,
+        visitorId: params.visitorId,
+      },
       include: {
         messages: {
           orderBy: { createdAt: "asc" },
@@ -150,6 +214,20 @@ export async function getOrCreateChatbotConversation(params: {
   return prisma.chatbotConversation.create({
     data: {
       visitorId: params.visitorId,
+    },
+    include: {
+      messages: {
+        orderBy: { createdAt: "asc" },
+      },
+      supportTicket: true,
+    },
+  });
+}
+
+export async function createChatbotConversation(visitorId: string) {
+  return prisma.chatbotConversation.create({
+    data: {
+      visitorId,
     },
     include: {
       messages: {
@@ -504,13 +582,23 @@ function buildPromptContext(params: {
     "Rules:",
     "- Keep the reply natural, tactful, and helpful.",
     "- Do not sound blunt, robotic, or overly process-driven.",
+    "- Keep most replies to 2 to 4 sentences unless the visitor asks for a detailed explanation.",
     "- Do not ask a long list of questions in one message.",
     "- Ask at most 1 or 2 focused follow-up questions at a time.",
     "- Follow phased discovery: first understand the broad need, then collect only the next most useful detail, then contact details when there is genuine buying intent.",
+    "- Never turn the conversation into a questionnaire or numbered intake form unless the visitor explicitly asks for a checklist.",
+    "- Do not ask for name, email, phone, and company all at once at the start of a sales conversation.",
+    "- For new sales inquiries, ask for contact details only after you understand the project well enough to give direction or the visitor clearly wants a proposal, estimate, or callback.",
+    "- Ask for budget and timeline later in the conversation, after the project scope is clearer.",
     "- If the visitor asks whether Doomple can help with something, answer that clearly first before collecting data.",
     "- When appropriate, suggest a likely-fit service or solution before asking for more details.",
     "- Prefer grouped, low-friction prompts like 'Could you share your name and best email?' instead of a long numbered checklist.",
     "- Once enough context exists, ask for the remaining essentials in the smallest possible next step.",
+    "- If the visitor asks for an estimate or recommendation, give a directional answer first, then ask only the next 1 or 2 highest-leverage details needed to refine it.",
+    "- For mobile app inquiries, use this flow: first confirm Doomple can help and ask whether it is a new app or an existing product plus target platform; next ask for 2 to 4 core features or key user flows and any must-have integrations; later ask about users or scale, then timeline or budget; only after that ask for contact details if the visitor wants a proposal or follow-up.",
+    "- Good example for a mobile app inquiry: 'Yes, we can help with custom mobile app development. Is this a new app or an existing product, and are you targeting iOS, Android, or both?'",
+    "- Good second-step example: 'Helpful. What are the main things users need to do in the app, and do you need any integrations like payments, auth, or an existing backend?'",
+    "- Good later-step example: 'That sounds like a strong fit. If you'd like, share your name and best email and I can recommend the best engagement model and next step.'",
     "- For support issues from existing customers, ask for email verification via OTP before creating a linked ticket.",
     "- Set shouldCreateLead true only when you have at least name, email, and a meaningful requirement summary.",
     "- Set shouldCreateTicket true only when you have a clear support issue summary.",
@@ -793,8 +881,233 @@ export async function getRecentChatbotConversations(limit = 20) {
   });
 }
 
+export async function getVisitorChatbotConversations(visitorId: string, limit = 12) {
+  const conversations = await prisma.chatbotConversation.findMany({
+    where: {
+      visitorId,
+    },
+    include: {
+      messages: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+      supportTicket: {
+        select: {
+          id: true,
+          ticketNumber: true,
+          status: true,
+        },
+      },
+      lead: {
+        select: {
+          id: true,
+          status: true,
+        },
+      },
+    },
+    orderBy: {
+      lastMessageAt: "desc",
+    },
+    take: limit,
+  });
+
+  return conversations.map((conversation) => {
+    const latestMessage = conversation.messages[0]?.content || null;
+
+    return {
+      id: conversation.id,
+      title: getConversationTitle({
+        summary: conversation.summary,
+        visitorName: conversation.visitorName,
+        visitorEmail: conversation.visitorEmail,
+        supportTicketNumber: conversation.supportTicket?.ticketNumber || null,
+        latestMessage,
+      }),
+      preview: latestMessage ? truncate(latestMessage, 88) : "No messages yet",
+      status: conversation.status,
+      intent: conversation.intent,
+      isCustomerVerified: conversation.isCustomerVerified,
+      lastMessageAt: conversation.lastMessageAt,
+      createdAt: conversation.createdAt,
+      supportTicket: conversation.supportTicket,
+      lead: conversation.lead,
+    };
+  });
+}
+
+export async function getChatbotConversationForVisitor(params: {
+  visitorId: string;
+  conversationId: string;
+}) {
+  return prisma.chatbotConversation.findFirst({
+    where: {
+      id: params.conversationId,
+      visitorId: params.visitorId,
+    },
+    include: {
+      messages: {
+        orderBy: { createdAt: "asc" },
+      },
+      supportTicket: true,
+      lead: true,
+      client: true,
+    },
+  });
+}
+
+export async function getChatbotConversationDetail(id: string) {
+  return prisma.chatbotConversation.findUnique({
+    where: { id },
+    include: {
+      messages: {
+        orderBy: { createdAt: "asc" },
+      },
+      lead: {
+        select: {
+          id: true,
+          fullName: true,
+          status: true,
+          email: true,
+        },
+      },
+      supportTicket: {
+        select: {
+          id: true,
+          ticketNumber: true,
+          status: true,
+          priority: true,
+          subject: true,
+        },
+      },
+      client: {
+        select: {
+          id: true,
+          companyName: true,
+          contactName: true,
+          email: true,
+          phone: true,
+        },
+      },
+    },
+  });
+}
+
+export async function updateChatbotConversation(params: {
+  id: string;
+  status?: string;
+  summary?: string;
+}) {
+  return prisma.chatbotConversation.update({
+    where: { id: params.id },
+    data: {
+      status: params.status ? (params.status as never) : undefined,
+      summary: typeof params.summary === "string" ? params.summary.trim() || null : undefined,
+    },
+  });
+}
+
+export async function getChatbotConversations(params: {
+  status?: string | null;
+  intent?: string | null;
+  verified?: string | null;
+  q?: string | null;
+  limit?: number;
+}) {
+  const conversations = await prisma.chatbotConversation.findMany({
+    where: {
+      ...(params.status ? { status: params.status as never } : {}),
+      ...(params.intent ? { intent: params.intent as never } : {}),
+      ...(params.verified === "true"
+        ? { isCustomerVerified: true }
+        : params.verified === "false"
+          ? { isCustomerVerified: false }
+          : {}),
+      ...(params.q
+        ? {
+            OR: [
+              { visitorName: { contains: params.q, mode: "insensitive" } },
+              { visitorEmail: { contains: params.q, mode: "insensitive" } },
+              { companyName: { contains: params.q, mode: "insensitive" } },
+              { summary: { contains: params.q, mode: "insensitive" } },
+              {
+                supportTicket: {
+                  is: {
+                    ticketNumber: { contains: params.q, mode: "insensitive" },
+                  },
+                },
+              },
+            ],
+          }
+        : {}),
+    },
+    include: {
+      messages: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+      lead: {
+        select: {
+          id: true,
+          fullName: true,
+          status: true,
+        },
+      },
+      supportTicket: {
+        select: {
+          id: true,
+          ticketNumber: true,
+          status: true,
+          priority: true,
+        },
+      },
+      client: {
+        select: {
+          id: true,
+          companyName: true,
+          contactName: true,
+        },
+      },
+      _count: {
+        select: {
+          messages: true,
+        },
+      },
+    },
+    orderBy: { lastMessageAt: "desc" },
+    take: params.limit || 50,
+  });
+
+  return conversations.map((conversation) => {
+    const latestMessage = conversation.messages[0]?.content || null;
+
+    return {
+      id: conversation.id,
+      title: getConversationTitle({
+        summary: conversation.summary,
+        visitorName: conversation.visitorName,
+        visitorEmail: conversation.visitorEmail,
+        supportTicketNumber: conversation.supportTicket?.ticketNumber || null,
+        latestMessage,
+      }),
+      preview: latestMessage ? truncate(latestMessage, 140) : "No messages yet",
+      status: conversation.status,
+      intent: conversation.intent,
+      visitorName: conversation.visitorName,
+      visitorEmail: conversation.visitorEmail,
+      companyName: conversation.companyName,
+      isCustomerVerified: conversation.isCustomerVerified,
+      lastMessageAt: conversation.lastMessageAt,
+      createdAt: conversation.createdAt,
+      messageCount: conversation._count.messages,
+      lead: conversation.lead,
+      supportTicket: conversation.supportTicket,
+      client: conversation.client,
+    };
+  });
+}
+
 export async function getChatbotDashboardData() {
-  const [knowledgeDocuments, conversations, tickets, settings] = await Promise.all([
+  const [knowledgeDocuments, conversations, tickets, settings, vectorStore] = await Promise.all([
     prisma.chatbotKnowledgeDocument.findMany({
       include: {
         _count: {
@@ -812,6 +1125,7 @@ export async function getChatbotDashboardData() {
       take: 20,
     }),
     getChatbotSettings(),
+    getChatbotVectorStore(),
   ]);
 
   return {
@@ -819,5 +1133,6 @@ export async function getChatbotDashboardData() {
     knowledgeDocuments,
     conversations,
     tickets,
+    vectorStore,
   };
 }

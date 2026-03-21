@@ -62,6 +62,24 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
+    const requesterEmail = body.requesterEmail ? String(body.requesterEmail).trim().toLowerCase() : undefined;
+    const requesterPhone = body.requesterPhone
+      ? String(body.requesterPhone).replace(/[^\d+]/g, "")
+      : body.requesterPhone === ""
+        ? null
+        : undefined;
+    const client =
+      typeof body.clientId === "string" && body.clientId
+        ? await prisma.client.findUnique({
+            where: { id: body.clientId },
+            select: { id: true },
+          })
+        : requesterEmail
+          ? await prisma.client.findUnique({
+              where: { email: requesterEmail },
+              select: { id: true },
+            })
+          : null;
 
     const ticket = await prisma.supportTicket.update({
       where: { id },
@@ -70,6 +88,13 @@ export async function PATCH(
         priority: body.priority || undefined,
         subject: body.subject || undefined,
         description: body.description || undefined,
+        requesterName: body.requesterName || undefined,
+        requesterEmail,
+        requesterPhone,
+        companyName:
+          typeof body.companyName === "string" ? body.companyName.trim() || null : undefined,
+        clientId:
+          body.clientId !== undefined || requesterEmail !== undefined ? client?.id || null : undefined,
         resolvedAt:
           body.status === "RESOLVED" || body.status === "CLOSED" ? new Date() : body.status ? null : undefined,
       },

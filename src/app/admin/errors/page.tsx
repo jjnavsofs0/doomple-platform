@@ -114,7 +114,7 @@ export default function AdminErrorsPage() {
   }, [query, severity, source, status]);
 
   React.useEffect(() => {
-    fetchLogs();
+    void fetchLogs();
   }, [fetchLogs]);
 
   const updateResolution = React.useCallback(
@@ -181,7 +181,7 @@ export default function AdminErrorsPage() {
         title="Errors"
         description="Track runtime issues, review critical alerts, and resolve incidents from one admin audit view."
         action={
-          <Button variant="outline" onClick={fetchLogs}>
+          <Button variant="outline" onClick={() => void fetchLogs()}>
             <RefreshCcw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
@@ -338,7 +338,7 @@ export default function AdminErrorsPage() {
                     </Button>
                     <Button
                       variant={log.isResolved ? "outline" : "default"}
-                      onClick={() => updateResolution(log, !log.isResolved)}
+                      onClick={() => void updateResolution(log, !log.isResolved)}
                       disabled={pendingId === log.id}
                     >
                       <CheckCircle2 className="mr-2 h-4 w-4" />

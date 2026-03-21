@@ -1110,6 +1110,8 @@ model ChatbotKnowledgeDocument {
   storageProvider  String?
   mimeType         String?
   size             Int?
+  openaiFileId     String?                       @unique
+  openaiFilename   String?
   createdAt        DateTime                      @default(now())
   updatedAt        DateTime                      @updatedAt
 
