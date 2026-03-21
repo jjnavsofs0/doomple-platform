@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "unset NODE_ENV && next dev",
+    "prebuild": "prisma migrate deploy",
     "build": "unset NODE_ENV && prisma generate && next build",
     "start": "unset NODE_ENV && next start",
     "lint": "next lint",
