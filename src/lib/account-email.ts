@@ -80,6 +80,16 @@ export async function createEmailChangeRequest(params: {
       </div>
     `,
     text: `Hello ${params.currentName || "there"},\n\n${introText}\n\nVerify the email here: ${verifyUrl}\n\nThis link expires in ${EMAIL_CHANGE_EXPIRY_HOURS} hours. If you did not request this change, you can ignore this email.`,
+    issueContext: {
+      title: "Account email verification email failed",
+      severity: "ERROR",
+      area: "account.email-change.send",
+      metadata: {
+        userId: params.userId,
+        newEmail: params.newEmail,
+        mode: params.mode || "change",
+      },
+    },
   });
 
   return {

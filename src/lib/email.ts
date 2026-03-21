@@ -1,4 +1,5 @@
 import { SendEmailCommand, SendRawEmailCommand, SESClient } from "@aws-sdk/client-ses";
+import { reportOperationalIssue } from "@/lib/operational-issues";
 
 function readEnvValue(name: string) {
   const value = process.env[name];
@@ -70,41 +71,83 @@ export async function sendTransactionalEmail(params: {
   html: string;
   text: string;
   replyTo?: string;
+  suppressIssueLog?: boolean;
+  issueContext?: {
+    title?: string;
+    severity?: "INFO" | "WARNING" | "ERROR" | "CRITICAL";
+    route?: string | null;
+    area?: string | null;
+    metadata?: Record<string, unknown> | null;
+  };
 }) {
   const sesClient = getSesClient();
   const fromEmail = readEnvValue("AWS_SES_FROM_EMAIL");
 
   if (!sesClient || !fromEmail) {
-    throw new Error(
+    const error = new Error(
       "AWS SES is not configured. Please set AWS_SES_REGION, AWS_SES_FROM_EMAIL, and SES credentials in environment variables."
     );
+    if (!params.suppressIssueLog) {
+      await reportOperationalIssue({
+        title: params.issueContext?.title || "Transactional email could not be sent",
+        error,
+        severity: params.issueContext?.severity || "ERROR",
+        route: params.issueContext?.route || null,
+        area: params.issueContext?.area || "email.transactional.config",
+        metadata: {
+          to: params.to,
+          subject: params.subject,
+          ...params.issueContext?.metadata,
+        },
+      });
+    }
+    throw error;
   }
 
-  await sesClient.send(
-    new SendEmailCommand({
-      Source: fromEmail,
-      Destination: {
-        ToAddresses: params.to,
-      },
-      ReplyToAddresses: params.replyTo ? [params.replyTo] : undefined,
-      Message: {
-        Subject: {
-          Charset: "UTF-8",
-          Data: params.subject,
+  try {
+    await sesClient.send(
+      new SendEmailCommand({
+        Source: fromEmail,
+        Destination: {
+          ToAddresses: params.to,
         },
-        Body: {
-          Html: {
+        ReplyToAddresses: params.replyTo ? [params.replyTo] : undefined,
+        Message: {
+          Subject: {
             Charset: "UTF-8",
-            Data: params.html,
+            Data: params.subject,
           },
-          Text: {
-            Charset: "UTF-8",
-            Data: params.text,
+          Body: {
+            Html: {
+              Charset: "UTF-8",
+              Data: params.html,
+            },
+            Text: {
+              Charset: "UTF-8",
+              Data: params.text,
+            },
           },
         },
-      },
-    })
-  );
+      })
+    );
+  } catch (error) {
+    if (!params.suppressIssueLog) {
+      await reportOperationalIssue({
+        title: params.issueContext?.title || "Transactional email delivery failed",
+        error,
+        severity: params.issueContext?.severity || "ERROR",
+        route: params.issueContext?.route || null,
+        area: params.issueContext?.area || "email.transactional.send",
+        metadata: {
+          to: params.to,
+          subject: params.subject,
+          fromEmail,
+          ...params.issueContext?.metadata,
+        },
+      });
+    }
+    throw error;
+  }
 }
 
 /**
@@ -122,14 +165,38 @@ export async function sendEmailWithAttachment(params: {
     content: Buffer;
     contentType: string;
   };
+  suppressIssueLog?: boolean;
+  issueContext?: {
+    title?: string;
+    severity?: "INFO" | "WARNING" | "ERROR" | "CRITICAL";
+    route?: string | null;
+    area?: string | null;
+    metadata?: Record<string, unknown> | null;
+  };
 }) {
   const sesClient = getSesClient();
   const fromEmail = readEnvValue("AWS_SES_FROM_EMAIL");
 
   if (!sesClient || !fromEmail) {
-    throw new Error(
+    const error = new Error(
       "AWS SES is not configured. Please set AWS_SES_REGION, AWS_SES_FROM_EMAIL, and SES credentials in environment variables."
     );
+    if (!params.suppressIssueLog) {
+      await reportOperationalIssue({
+        title: params.issueContext?.title || "Email attachment delivery could not be sent",
+        error,
+        severity: params.issueContext?.severity || "ERROR",
+        route: params.issueContext?.route || null,
+        area: params.issueContext?.area || "email.attachment.config",
+        metadata: {
+          to: params.to,
+          subject: params.subject,
+          attachmentFilename: params.attachment?.filename || null,
+          ...params.issueContext?.metadata,
+        },
+      });
+    }
+    throw error;
   }
 
   const boundary = `boundary_${Date.now()}`;
@@ -181,11 +248,31 @@ export async function sendEmailWithAttachment(params: {
 
   const rawMessage = lines.join("\r\n");
 
-  await sesClient.send(
-    new SendRawEmailCommand({
-      RawMessage: {
-        Data: Buffer.from(rawMessage),
-      },
-    })
-  );
+  try {
+    await sesClient.send(
+      new SendRawEmailCommand({
+        RawMessage: {
+          Data: Buffer.from(rawMessage),
+        },
+      })
+    );
+  } catch (error) {
+    if (!params.suppressIssueLog) {
+      await reportOperationalIssue({
+        title: params.issueContext?.title || "Email attachment delivery failed",
+        error,
+        severity: params.issueContext?.severity || "ERROR",
+        route: params.issueContext?.route || null,
+        area: params.issueContext?.area || "email.attachment.send",
+        metadata: {
+          to: params.to,
+          subject: params.subject,
+          fromEmail,
+          attachmentFilename: params.attachment?.filename || null,
+          ...params.issueContext?.metadata,
+        },
+      });
+    }
+    throw error;
+  }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -8,8 +8,10 @@ import {
   Bot,
   Briefcase,
   Building2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   CreditCard,
   FileText,
   LayoutDashboard,
@@ -145,8 +147,11 @@ const roleLabels: Record<string, string> = {
 export function AdminSidebar({ className }: AdminSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [openErrorCount, setOpenErrorCount] = useState(0);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+  const [canScrollDown, setCanScrollDown] = useState(false);
   const pathname = usePathname();
   const { data: session } = useCurrentSession();
+  const navRef = useRef<HTMLElement | null>(null);
 
   const role = (session?.user as { role?: string })?.role || "";
   const canViewErrors = role === "SUPER_ADMIN" || role === "ADMIN";
@@ -205,10 +210,42 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
     },
   });
 
+  useEffect(() => {
+    const navElement = navRef.current;
+    if (!navElement) {
+      return;
+    }
+
+    const updateScrollState = () => {
+      const nextCanScrollUp = navElement.scrollTop > 12;
+      const nextCanScrollDown =
+        navElement.scrollTop + navElement.clientHeight < navElement.scrollHeight - 12;
+
+      setCanScrollUp(nextCanScrollUp);
+      setCanScrollDown(nextCanScrollDown);
+    };
+
+    updateScrollState();
+    navElement.addEventListener("scroll", updateScrollState, { passive: true });
+    window.addEventListener("resize", updateScrollState);
+
+    return () => {
+      navElement.removeEventListener("scroll", updateScrollState);
+      window.removeEventListener("resize", updateScrollState);
+    };
+  }, [filteredGroups.length, isCollapsed]);
+
+  function scrollMenu(direction: "up" | "down") {
+    navRef.current?.scrollBy({
+      top: direction === "up" ? -220 : 220,
+      behavior: "smooth",
+    });
+  }
+
   return (
     <aside
       className={cn(
-        "flex h-screen flex-col transition-all duration-300",
+        "flex h-screen flex-col overflow-hidden transition-all duration-300",
         isCollapsed ? "w-[84px]" : "w-[280px]",
         className
       )}
@@ -240,79 +277,107 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
         )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-5">
-        <div className="space-y-6">
-          {filteredGroups.map((group) => (
-            <div key={group.label} className="space-y-3">
-              {!isCollapsed && (
-                <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">
-                  {group.label}
-                </p>
-              )}
+      <div className="relative min-h-0 flex-1 px-3">
+        <nav ref={navRef} className="scrollbar-hidden h-full min-h-0 overflow-y-auto py-5">
+          <div className="space-y-6">
+            {filteredGroups.map((group) => (
+              <div key={group.label} className="space-y-3">
+                {!isCollapsed && (
+                  <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">
+                    {group.label}
+                  </p>
+                )}
 
-              <div className="space-y-1">
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  const active = isActive(item.href);
-                  const badgeCount = item.href === "/admin/errors" ? openErrorCount : 0;
+                <div className="space-y-1">
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.href);
+                    const badgeCount = item.href === "/admin/errors" ? openErrorCount : 0;
 
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      title={isCollapsed ? item.label : undefined}
-                      className={cn(
-                        "group relative flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all",
-                        isCollapsed ? "justify-center" : "",
-                        active
-                          ? "bg-[#0F335C] text-white"
-                          : "text-slate-200 hover:bg-white/5 hover:text-white"
-                      )}
-                    >
-                      {active && !isCollapsed && (
-                        <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-[#34D3C3]" />
-                      )}
-                      <Icon
-                        className="h-[18px] w-[18px] flex-shrink-0"
-                        style={active ? { color: "#6DEADB" } : { color: "rgba(226,232,240,0.88)" }}
-                      />
-                      {!isCollapsed && (
-                        <>
-                          <span className={cn("tracking-[0.01em]", active ? "text-white" : "text-inherit")}>
-                            {item.label}
-                          </span>
-                          <div className="ml-auto flex items-center gap-2">
-                            {badgeCount > 0 ? (
-                              <span
-                                className={cn(
-                                  "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                                  active
-                                    ? "bg-[#34D3C3]/20 text-[#9AF6EA]"
-                                    : "bg-white/10 text-white/90"
-                                )}
-                              >
-                                {badgeCount > 99 ? "99+" : badgeCount}
-                              </span>
-                            ) : null}
-                            {active && (
-                              <span className="h-2 w-2 rounded-full bg-[#34D3C3]" />
-                            )}
-                          </div>
-                        </>
-                      )}
-                      {isCollapsed && badgeCount > 0 ? (
-                        <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[#34D3C3]" />
-                      ) : null}
-                    </Link>
-                  );
-                })}
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        title={isCollapsed ? item.label : undefined}
+                        className={cn(
+                          "group relative flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all",
+                          isCollapsed ? "justify-center" : "",
+                          active
+                            ? "bg-[#0F335C] text-white"
+                            : "text-slate-200 hover:bg-white/5 hover:text-white"
+                        )}
+                      >
+                        {active && !isCollapsed && (
+                          <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-[#34D3C3]" />
+                        )}
+                        <Icon
+                          className="h-[18px] w-[18px] flex-shrink-0"
+                          style={active ? { color: "#6DEADB" } : { color: "rgba(226,232,240,0.88)" }}
+                        />
+                        {!isCollapsed && (
+                          <>
+                            <span className={cn("tracking-[0.01em]", active ? "text-white" : "text-inherit")}>
+                              {item.label}
+                            </span>
+                            <div className="ml-auto flex items-center gap-2">
+                              {badgeCount > 0 ? (
+                                <span
+                                  className={cn(
+                                    "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                                    active
+                                      ? "bg-[#34D3C3]/20 text-[#9AF6EA]"
+                                      : "bg-white/10 text-white/90"
+                                  )}
+                                >
+                                  {badgeCount > 99 ? "99+" : badgeCount}
+                                </span>
+                              ) : null}
+                              {active && (
+                                <span className="h-2 w-2 rounded-full bg-[#34D3C3]" />
+                              )}
+                            </div>
+                          </>
+                        )}
+                        {isCollapsed && badgeCount > 0 ? (
+                          <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[#34D3C3]" />
+                        ) : null}
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </nav>
+            ))}
+          </div>
+        </nav>
 
-      <div className="border-t border-white/8 px-3 py-3">
+        {canScrollUp ? (
+          <div className="pointer-events-none absolute inset-x-3 top-0 flex justify-center bg-gradient-to-b from-[#07223F] via-[#07223F]/95 to-transparent pt-2">
+            <button
+              type="button"
+              onClick={() => scrollMenu("up")}
+              className="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/80 backdrop-blur transition hover:bg-white/15 hover:text-white"
+              aria-label="Scroll admin menu up"
+            >
+              <ChevronUp className="h-4 w-4" />
+            </button>
+          </div>
+        ) : null}
+
+        {canScrollDown ? (
+          <div className="pointer-events-none absolute inset-x-3 bottom-0 flex justify-center bg-gradient-to-t from-[#07223F] via-[#07223F]/95 to-transparent pb-2 pt-8">
+            <button
+              type="button"
+              onClick={() => scrollMenu("down")}
+              className="pointer-events-auto inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/80 backdrop-blur transition hover:bg-white/15 hover:text-white"
+              aria-label="Scroll admin menu down"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="shrink-0 border-t border-white/8 px-3 py-3">
         {isCollapsed ? (
           <div className="space-y-2">
             <button

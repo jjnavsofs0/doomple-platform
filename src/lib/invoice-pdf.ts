@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { prisma } from "@/lib/prisma";
 import { getAppSettingValue } from "@/lib/app-settings";
+import { reportOperationalIssue } from "@/lib/operational-issues";
 import { getStoredFileUrl, uploadFile } from "@/lib/storage";
 
 export async function getInvoicePdfData(invoiceId: string) {
@@ -259,6 +260,15 @@ export async function ensureInvoicePdfAttachment(invoiceId: string) {
       }),
     };
   } catch (error) {
+    await reportOperationalIssue({
+      title: "Invoice PDF storage sync failed",
+      error,
+      severity: "WARNING",
+      area: "invoice.pdf.storage-sync",
+      metadata: {
+        invoiceId,
+      },
+    });
     console.warn(
       "Invoice PDF storage sync failed; serving generated PDF without attachment:",
       error instanceof Error ? error.message : error

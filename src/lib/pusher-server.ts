@@ -1,4 +1,5 @@
 import Pusher from "pusher";
+import { reportOperationalIssue } from "@/lib/operational-issues";
 
 let pusherServer: Pusher | null | undefined;
 
@@ -45,6 +46,16 @@ export async function triggerRealtimeEvent(
 ) {
   const pusher = getPusherServer();
   if (!pusher) {
+    await reportOperationalIssue({
+      title: "Realtime event could not be delivered",
+      error: "Pusher is not configured",
+      severity: "WARNING",
+      area: "realtime.pusher.config",
+      metadata: {
+        channels,
+        eventName,
+      },
+    });
     return false;
   }
 
@@ -52,7 +63,16 @@ export async function triggerRealtimeEvent(
     await pusher.trigger(channels, eventName, payload);
     return true;
   } catch (error) {
-    console.error("Pusher trigger failed:", error);
+    await reportOperationalIssue({
+      title: "Realtime event delivery failed",
+      error,
+      severity: "ERROR",
+      area: "realtime.pusher.trigger",
+      metadata: {
+        channels,
+        eventName,
+      },
+    });
     return false;
   }
 }

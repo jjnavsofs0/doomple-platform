@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import {
-  createChatbotConversation,
   getChatbotConversationForVisitor,
   getChatbotSettings,
   getVisitorChatbotConversations,
@@ -16,6 +15,7 @@ const CHATBOT_CONVERSATION_COOKIE = "doomple_chatbot_conversation";
 async function buildSessionResponse(params: {
   visitorId: string;
   conversationId?: string | null;
+  restoreLatestConversation?: boolean;
 }) {
   const settings = await getChatbotSettings();
   let activeConversationId = "";
@@ -25,10 +25,10 @@ async function buildSessionResponse(params: {
       visitorId: params.visitorId,
       conversationId: params.conversationId,
     });
-    activeConversationId = selectedConversation?.id || "";
+    activeConversationId = selectedConversation?.messages.length ? selectedConversation.id : "";
   }
 
-  if (!activeConversationId) {
+  if (!activeConversationId && params.restoreLatestConversation !== false) {
     const previousConversations = await getVisitorChatbotConversations(params.visitorId, 1);
     activeConversationId = previousConversations[0]?.id || "";
   }
@@ -38,28 +38,24 @@ async function buildSessionResponse(params: {
         visitorId: params.visitorId,
         conversationId: activeConversationId,
       })
-    : await createChatbotConversation(params.visitorId);
-
-  if (!conversation) {
-    throw new Error("Failed to resolve chatbot conversation");
-  }
+    : null;
 
   const conversations = await getVisitorChatbotConversations(params.visitorId);
 
   return {
-    conversationId: conversation.id,
+    conversationId: conversation?.id || null,
     visitorId: params.visitorId,
-    isCustomerVerified: conversation.isCustomerVerified,
+    isCustomerVerified: conversation?.isCustomerVerified || false,
     assistantName: settings.assistantName,
     welcomeMessage: settings.welcomeMessage,
-    messages: conversation.messages,
+    messages: conversation?.messages || [],
     conversations,
   };
 }
 
 function applyChatCookies(response: NextResponse, params: {
   visitorId: string;
-  conversationId: string;
+  conversationId?: string | null;
 }) {
   response.cookies.set(CHATBOT_VISITOR_COOKIE, params.visitorId, {
     httpOnly: false,
@@ -67,12 +63,16 @@ function applyChatCookies(response: NextResponse, params: {
     path: "/",
     maxAge: 60 * 60 * 24 * 180,
   });
-  response.cookies.set(CHATBOT_CONVERSATION_COOKIE, params.conversationId, {
-    httpOnly: false,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
+  if (params.conversationId) {
+    response.cookies.set(CHATBOT_CONVERSATION_COOKIE, params.conversationId, {
+      httpOnly: false,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 30,
+    });
+  } else {
+    response.cookies.delete(CHATBOT_CONVERSATION_COOKIE);
+  }
 
   return response;
 }
@@ -85,6 +85,7 @@ export async function GET() {
     const data = await buildSessionResponse({
       visitorId,
       conversationId,
+      restoreLatestConversation: true,
     });
 
     return applyChatCookies(
@@ -115,8 +116,7 @@ export async function POST(request: Request) {
     let conversationId = "";
 
     if (body?.action === "new") {
-      const conversation = await createChatbotConversation(visitorId);
-      conversationId = conversation.id;
+      conversationId = "";
     } else if (typeof body?.conversationId === "string" && body.conversationId.trim()) {
       const existing = await getChatbotConversationForVisitor({
         visitorId,
@@ -141,6 +141,7 @@ export async function POST(request: Request) {
     const data = await buildSessionResponse({
       visitorId,
       conversationId,
+      restoreLatestConversation: body?.action === "new" ? false : true,
     });
 
     return applyChatCookies(
@@ -150,7 +151,7 @@ export async function POST(request: Request) {
       }),
       {
         visitorId,
-        conversationId: data.conversationId,
+        conversationId: data.conversationId || null,
       }
     );
   } catch (error) {

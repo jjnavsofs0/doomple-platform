@@ -2,6 +2,7 @@ import { NotificationType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { triggerRealtimeEvent } from "@/lib/pusher-server";
 import { isSesConfigured, sendTransactionalEmail } from "@/lib/email";
+import { reportOperationalIssue } from "@/lib/operational-issues";
 
 export const ADMIN_GLOBAL_CHANNEL = "private-admin-global";
 const ADMIN_NOTIFICATION_ROLES = ["SUPER_ADMIN", "ADMIN", "SALES", "PROJECT_MANAGER", "FINANCE"] as const;
@@ -60,6 +61,17 @@ async function sendAdminActivityEmail(params: {
   subject?: string;
 }) {
   if (!isSesConfigured()) {
+    await reportOperationalIssue({
+      title: "Admin notification email skipped",
+      error: "AWS SES is not configured",
+      severity: "WARNING",
+      area: "notifications.admin-email.config",
+      metadata: {
+        title: params.title,
+        type: params.type,
+        link: params.link || null,
+      },
+    });
     return;
   }
 
@@ -111,6 +123,16 @@ async function sendAdminActivityEmail(params: {
       </div>
     `,
     replyTo: process.env.AWS_SES_REPLY_TO || undefined,
+    issueContext: {
+      title: "Admin notification email failed",
+      severity: "ERROR",
+      area: "notifications.admin-email.send",
+      metadata: {
+        notificationTitle: params.title,
+        type: params.type,
+        link: params.link || null,
+      },
+    },
   });
 }
 

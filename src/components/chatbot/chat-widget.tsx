@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Clock3, Loader2, MessageSquare, Plus, Send, Sparkles, X } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { ArrowUp, Clock3, Loader2, MessageSquare, Plus, Send, Sparkles, X } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 
 type ChatMessage = {
@@ -22,7 +23,7 @@ type ConversationSummary = {
 };
 
 type SessionPayload = {
-  conversationId: string;
+  conversationId: string | null;
   assistantName: string;
   welcomeMessage: string;
   messages: ChatMessage[];
@@ -31,9 +32,55 @@ type SessionPayload = {
 
 const DEFAULT_WELCOME =
   "Hi, welcome to Doomple. Tell me a bit about what you're looking to build or improve, and I'll help you figure out the right next step.";
+const AUTO_PROMPT_KEY = "doomple_chatbot_auto_prompted";
+const AUTO_PROMPT_DELAY_MS = 12000;
+const MIN_AUTO_PROMPT_WIDTH = 960;
 
 function formatConversationTime(value: string) {
   return formatDate(value, "MMM d, h:mm a");
+}
+
+function isHighIntentPath(pathname: string) {
+  return [
+    /^\/pricing(?:\/|$)/i,
+    /^\/contact(?:\/|$)/i,
+    /^\/services(?:\/|$)/i,
+    /^\/solutions(?:\/|$)/i,
+    /^\/book(?:\/|$)/i,
+    /^\/consult(?:\/|$)/i,
+  ].some((pattern) => pattern.test(pathname));
+}
+
+function getSalesPrompt(pathname: string, fallback: string) {
+  if (/^\/pricing(?:\/|$)/i.test(pathname)) {
+    return "Working out scope or price? Tell me what you want to build and I can suggest the right engagement model and next step.";
+  }
+
+  if (/^\/services(?:\/|$)/i.test(pathname)) {
+    return "Exploring services? Share the business outcome you need and I’ll point you to the best-fit service path.";
+  }
+
+  if (/^\/solutions(?:\/|$)/i.test(pathname)) {
+    return "Looking at solutions? Tell me your use case and I can help narrow the best fit before you talk to the team.";
+  }
+
+  if (/^\/contact(?:\/|$)/i.test(pathname)) {
+    return "Before you reach out, tell me what you need help with and I’ll help frame the fastest next step.";
+  }
+
+  return fallback;
+}
+
+function getInputPlaceholder(pathname: string) {
+  if (/^\/pricing(?:\/|$)/i.test(pathname)) {
+    return "Describe the project or budget question you have...";
+  }
+
+  if (/^\/services(?:\/|$)|^\/solutions(?:\/|$)/i.test(pathname)) {
+    return "Tell me what you're trying to achieve...";
+  }
+
+  return "Tell me what you're planning, and I'll guide you from there...";
 }
 
 function getRenderableMessages(messages: ChatMessage[], welcomeMessage: string) {
@@ -52,6 +99,7 @@ function getRenderableMessages(messages: ChatMessage[], welcomeMessage: string) 
 }
 
 export function ChatWidget() {
+  const pathname = usePathname() || "/";
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -62,6 +110,7 @@ export function ChatWidget() {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
+  const [showBackToTop, setShowBackToTop] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   function applySession(payload: SessionPayload) {
@@ -71,7 +120,7 @@ export function ChatWidget() {
     setAssistantName(payload.assistantName || "Doomple AI Advisor");
     setWelcomeMessage(nextWelcome);
     setConversations(payload.conversations || []);
-    setMessages(getRenderableMessages(payload.messages || [], nextWelcome));
+    setMessages(payload.messages || []);
   }
 
   async function loadSession(requestInit?: RequestInit) {
@@ -106,14 +155,70 @@ export function ChatWidget() {
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, open]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 480);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (
+      loading ||
+      open ||
+      conversationId ||
+      messages.length > 0 ||
+      conversations.length > 0 ||
+      !isHighIntentPath(pathname) ||
+      typeof window === "undefined" ||
+      window.innerWidth < MIN_AUTO_PROMPT_WIDTH ||
+      window.sessionStorage.getItem(AUTO_PROMPT_KEY) === "1"
+    ) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      window.sessionStorage.setItem(AUTO_PROMPT_KEY, "1");
+      setOpen(true);
+    }, AUTO_PROMPT_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [conversationId, conversations.length, loading, messages.length, open, pathname]);
+
+  const displayWelcomeMessage = useMemo(() => {
+    if (conversationId || conversations.length > 0) {
+      return welcomeMessage;
+    }
+
+    return getSalesPrompt(pathname, welcomeMessage);
+  }, [conversationId, conversations.length, pathname, welcomeMessage]);
+
+  const renderableMessages = useMemo(
+    () => getRenderableMessages(messages, displayWelcomeMessage),
+    [displayWelcomeMessage, messages]
+  );
+
   const canSend = useMemo(() => input.trim().length > 0 && !sending && !loading, [input, sending, loading]);
 
   async function handleSend() {
-    if (!canSend || !conversationId) return;
+    if (!canSend) return;
 
     const text = input.trim();
+    const optimisticId = `local-${Date.now()}`;
     const optimistic: ChatMessage = {
-      id: `local-${Date.now()}`,
+      id: optimisticId,
       role: "USER",
       content: text,
       createdAt: new Date().toISOString(),
@@ -153,6 +258,8 @@ export function ChatWidget() {
         },
       ]);
     } catch (err) {
+      setMessages((current) => current.filter((message) => message.id !== optimisticId));
+      setInput(text);
       setError(err instanceof Error ? err.message : "Failed to send message");
     } finally {
       setSending(false);
@@ -160,6 +267,10 @@ export function ChatWidget() {
   }
 
   async function handleStartNewConversation() {
+    setError("");
+    setInput("");
+    setConversationId(null);
+    setMessages([]);
     await loadSession({
       method: "POST",
       headers: {
@@ -187,16 +298,52 @@ export function ChatWidget() {
     });
   }
 
+  function handleToggleChat() {
+    if (
+      typeof window !== "undefined" &&
+      isHighIntentPath(pathname) &&
+      !conversationId &&
+      messages.length === 0
+    ) {
+      window.sessionStorage.setItem(AUTO_PROMPT_KEY, "1");
+    }
+
+    setOpen((current) => !current);
+  }
+
+  function handleBackToTop() {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-        className="fixed bottom-5 right-5 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#07223F] text-white shadow-[0_18px_40px_-18px_rgba(7,34,63,0.7)] transition-transform hover:scale-[1.02]"
-        aria-label={open ? "Close chat" : "Open chat"}
-      >
-        {open ? <X className="h-5 w-5" /> : <MessageSquare className="h-5 w-5" />}
-      </button>
+      <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3">
+        <button
+          type="button"
+          onClick={handleBackToTop}
+          className={cn(
+            "inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-[#07223F] shadow-[0_16px_38px_-18px_rgba(7,34,63,0.45)] transition-all",
+            showBackToTop
+              ? "translate-y-0 opacity-100"
+              : "pointer-events-none translate-y-3 opacity-0"
+          )}
+          aria-label="Go to top"
+        >
+          <ArrowUp className="h-4 w-4" />
+        </button>
+
+        <button
+          type="button"
+          onClick={handleToggleChat}
+          className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/85 bg-[linear-gradient(135deg,#07223F_0%,#0A6E74_100%)] text-white shadow-[0_22px_52px_-22px_rgba(7,34,63,0.9)] ring-4 ring-white/70 transition-transform hover:scale-[1.02]"
+          aria-label={open ? "Close chat" : "Open chat"}
+        >
+          {open ? <X className="h-5 w-5" /> : <MessageSquare className="h-5 w-5" />}
+        </button>
+      </div>
 
       {open ? (
         <div className="fixed bottom-24 right-5 z-40 w-[calc(100vw-2rem)] max-w-[410px] overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_32px_80px_-32px_rgba(7,34,63,0.45)]">
@@ -223,33 +370,58 @@ export function ChatWidget() {
             </div>
           </div>
 
-          <div className="border-b border-slate-200 bg-[#F4F8FC] px-4 py-3">
-            <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              <Clock3 className="h-3.5 w-3.5" />
-              Recent conversations
+          {conversations.length ? (
+            <div className="border-b border-slate-200 bg-[#F4F8FC] px-4 py-3">
+              <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                <Clock3 className="h-3.5 w-3.5" />
+                Recent
+              </div>
+              <div className="max-h-[168px] space-y-2 overflow-y-auto pr-1">
+                {conversations.map((conversation) => (
+                  <button
+                    key={conversation.id}
+                    type="button"
+                    onClick={() => void handleSelectConversation(conversation.id)}
+                    className={cn(
+                      "flex w-full items-start gap-3 rounded-2xl border px-3 py-2.5 text-left transition",
+                      conversation.id === conversationId
+                        ? "border-[#1ABFAD] bg-white shadow-sm"
+                        : "border-slate-200 bg-white/80 hover:border-slate-300"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full",
+                        conversation.id === conversationId ? "bg-[#1ABFAD]" : "bg-slate-300"
+                      )}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="truncate text-sm font-semibold text-[#042042]">{conversation.title}</p>
+                        <p className="flex-shrink-0 text-[10px] uppercase tracking-[0.14em] text-slate-400">
+                          {formatConversationTime(conversation.lastMessageAt)}
+                        </p>
+                      </div>
+                      <p className="mt-0.5 truncate text-xs leading-5 text-slate-500">
+                        {conversation.preview}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {conversations.map((conversation) => (
-                <button
-                  key={conversation.id}
-                  type="button"
-                  onClick={() => void handleSelectConversation(conversation.id)}
-                  className={cn(
-                    "min-w-[162px] rounded-2xl border px-3 py-3 text-left transition",
-                    conversation.id === conversationId
-                      ? "border-[#1ABFAD] bg-white shadow-sm"
-                      : "border-slate-200 bg-white/80 hover:border-slate-300"
-                  )}
-                >
-                  <p className="truncate text-sm font-semibold text-[#042042]">{conversation.title}</p>
-                  <p className="mt-1 h-10 overflow-hidden text-xs leading-5 text-slate-500">{conversation.preview}</p>
-                  <p className="mt-2 text-[11px] uppercase tracking-[0.16em] text-slate-400">
-                    {formatConversationTime(conversation.lastMessageAt)}
-                  </p>
-                </button>
-              ))}
+          ) : null}
+
+          {!loading && !conversationId && messages.length === 0 ? (
+            <div className="border-b border-slate-200 bg-[#F8FBFF] px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0A6E74]">
+                New conversation
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Start fresh.
+              </p>
             </div>
-          </div>
+          ) : null}
 
           <div ref={scrollRef} className="max-h-[360px] space-y-3 overflow-y-auto bg-[#F8FBFF] px-4 py-4">
             {loading ? (
@@ -258,7 +430,7 @@ export function ChatWidget() {
                 Loading your conversations...
               </div>
             ) : (
-              messages.map((message) => (
+              renderableMessages.map((message) => (
                 <div
                   key={message.id}
                   className={cn(
@@ -274,8 +446,14 @@ export function ChatWidget() {
             )}
             {sending ? (
               <div className="max-w-[88%] rounded-2xl bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
-                <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
-                Thinking...
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex gap-1">
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-[#0A6E74] [animation-delay:-0.2s]" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-[#0A6E74] [animation-delay:-0.1s]" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-[#0A6E74]" />
+                  </span>
+                  <span>Writing a reply...</span>
+                </div>
               </div>
             ) : null}
           </div>
@@ -293,7 +471,7 @@ export function ChatWidget() {
                   }
                 }}
                 rows={2}
-                placeholder="Tell me what you're planning, and I'll guide you from there..."
+                placeholder={getInputPlaceholder(pathname)}
                 className="min-h-[52px] flex-1 resize-none rounded-2xl border border-slate-200 bg-[#F8FBFF] px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-[#1ABFAD] focus:ring-2 focus:ring-[#1ABFAD]/20"
               />
               <button

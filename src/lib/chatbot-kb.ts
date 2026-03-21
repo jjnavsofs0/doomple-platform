@@ -3,6 +3,7 @@ import path from "path";
 import { pathToFileURL } from "url";
 import { prisma } from "@/lib/prisma";
 import { getOpenAIClient, isOpenAIConfigured } from "@/lib/openai";
+import { reportOperationalIssue } from "@/lib/operational-issues";
 import { slugify } from "@/lib/utils";
 
 type CreateKnowledgeDocumentInput = {
@@ -99,6 +100,15 @@ export async function getChatbotVectorStore() {
   try {
     return await getOpenAIClient().vectorStores.retrieve(vectorStoreId);
   } catch (error) {
+    await reportOperationalIssue({
+      title: "Chatbot vector store could not be loaded",
+      error,
+      severity: "WARNING",
+      area: "chatbot.vector-store.retrieve",
+      metadata: {
+        vectorStoreId,
+      },
+    });
     console.warn("Failed to load chatbot vector store:", error);
     return null;
   }
@@ -135,6 +145,15 @@ async function deleteOpenAIKnowledgeFile(openaiFileId?: string | null) {
   try {
     await getOpenAIClient().files.delete(openaiFileId);
   } catch (error) {
+    await reportOperationalIssue({
+      title: "Chatbot knowledge file cleanup failed",
+      error,
+      severity: "WARNING",
+      area: "chatbot.vector-store.delete-file",
+      metadata: {
+        openaiFileId,
+      },
+    });
     console.warn(`Failed to delete OpenAI file ${openaiFileId}:`, error);
   }
 }

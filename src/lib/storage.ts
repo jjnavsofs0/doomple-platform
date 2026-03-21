@@ -3,6 +3,7 @@ import { mkdir, rm, writeFile } from "fs/promises";
 import path from "path";
 import { PutObjectCommand, DeleteObjectCommand, GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { reportOperationalIssue } from "@/lib/operational-issues";
 
 const LOCAL_UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 type StorageVisibility = "public" | "private";
@@ -84,6 +85,18 @@ export async function uploadFile(params: {
             : "",
       };
     } catch (error) {
+      await reportOperationalIssue({
+        title: "S3 upload failed; local storage fallback used",
+        error,
+        severity: "WARNING",
+        area: "storage.s3.upload",
+        metadata: {
+          storageKey,
+          bucket,
+          visibility,
+          fileName: params.fileName,
+        },
+      });
       console.warn(
         `S3 upload failed for ${storageKey}; falling back to local storage:`,
         error instanceof Error ? error.message : error

@@ -1,8 +1,6 @@
 import { createHash } from "crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { sendTransactionalEmail } from "@/lib/email";
-import { notifyAdmins } from "@/lib/realtime";
 
 export type AppErrorSeverityValue = "INFO" | "WARNING" | "ERROR" | "CRITICAL";
 export type AppErrorSourceValue = "CLIENT" | "SERVER" | "RENDER";
@@ -82,6 +80,7 @@ async function sendErrorAlertEmail(params: {
 }) {
   const recipients = getAlertRecipients();
   if (recipients.length === 0) return;
+  const { sendTransactionalEmail } = await import("@/lib/email");
 
   const subject = `[Doomple ${params.severity === "CRITICAL" ? "Critical" : "Error"}] ${params.title}`;
   const metadataBlock = params.metadata
@@ -131,6 +130,7 @@ async function sendErrorAlertEmail(params: {
     html,
     text,
     replyTo: process.env.AWS_SES_REPLY_TO || undefined,
+    suppressIssueLog: true,
   });
 }
 
@@ -193,6 +193,8 @@ export async function recordAppError(params: RecordAppErrorParams) {
 
   if (shouldAlert) {
     try {
+      const { notifyAdmins } = await import("@/lib/realtime");
+
       await notifyAdmins({
         title: severity === "CRITICAL" ? "Critical app error" : "Application error",
         message: `${title}${params.route ? ` on ${params.route}` : ""}`,

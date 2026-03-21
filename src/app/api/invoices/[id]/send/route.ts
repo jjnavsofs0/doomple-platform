@@ -149,6 +149,17 @@ export async function POST(
         content: bytes,
         contentType: "application/pdf",
       },
+      issueContext: {
+        title: "Invoice email delivery failed",
+        severity: "ERROR",
+        route: `/api/invoices/${params.id}/send`,
+        area: "invoice.email.send",
+        metadata: {
+          invoiceId: params.id,
+          invoiceNumber: invoice.invoiceNumber,
+          recipientEmail: invoice.client.email,
+        },
+      },
     });
 
     // Optionally save PDF to S3 — non-blocking, errors are logged only
