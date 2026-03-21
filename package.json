@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "unset NODE_ENV && next dev",
-    "prebuild": "prisma migrate deploy",
+    "prebuild": "node scripts/prisma-migrate-deploy-with-retry.mjs",
     "build": "unset NODE_ENV && prisma generate && next build",
     "start": "unset NODE_ENV && next start",
     "lint": "next lint",
