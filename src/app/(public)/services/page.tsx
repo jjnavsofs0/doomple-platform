@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { services } from "@/data/services";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
-import * as Icons from "lucide-react";
+import { getLucideIcon } from "@/lib/lucide-icon-map";
 
 export const metadata: Metadata = {
   title: "Software Development & IT Consulting Services India | Doomple Technologies",
@@ -60,19 +60,8 @@ function groupServicesByCategory(allServices: typeof services) {
   return result;
 }
 
-const iconMap: Record<string, any> = {
-  Code: Icons.Code, Brain: Icons.Brain, Smartphone: Icons.Smartphone,
-  BarChart3: Icons.BarChart3, BarChart2: Icons.BarChart2, ShoppingCart: Icons.ShoppingCart,
-  FileText: Icons.FileText, Cloud: Icons.Cloud, Wrench: Icons.Wrench,
-  Users: Icons.Users, Megaphone: Icons.Megaphone, Share2: Icons.Share2,
-  Zap: Icons.Zap, Rocket: Icons.Rocket, CheckSquare: Icons.CheckSquare,
-  TrendingUp: Icons.TrendingUp, Database: Icons.Database, Cpu: Icons.Cpu,
-  Lightbulb: Icons.Lightbulb, GraduationCap: Icons.GraduationCap, Briefcase: Icons.Briefcase,
-  SearchCode: Icons.SearchCode, ClipboardCheck: Icons.ClipboardCheck, RefreshCw: Icons.RefreshCw,
-};
-
 function getIcon(iconName: string) {
-  return iconMap[iconName] || Icons.Code;
+  return getLucideIcon(iconName);
 }
 
 export default function ServicesPage() {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { ADMIN_GLOBAL_CHANNEL, getUserPrivateChannel } from "@/lib/realtime";
-import { getPusherServer } from "@/lib/pusher-server";
+import { authorizePusherChannel, isPusherConfigured } from "@/lib/pusher-server";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +21,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing channel auth payload" }, { status: 400 });
     }
 
-    const pusher = getPusherServer();
-    if (!pusher) {
+    if (!isPusherConfigured()) {
       return NextResponse.json({ error: "Pusher is not configured" }, { status: 503 });
     }
 
@@ -38,7 +37,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const auth = pusher.authorizeChannel(socketId, channelName);
+    const auth = authorizePusherChannel(socketId, channelName);
+    if (!auth) {
+      return NextResponse.json({ error: "Pusher is not configured" }, { status: 503 });
+    }
+
     return NextResponse.json(auth);
   } catch (error) {
     console.error("Pusher auth error:", error);

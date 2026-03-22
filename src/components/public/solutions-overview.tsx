@@ -1,10 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ComponentType, SVGProps } from "react";
+import { Server } from "lucide-react";
 import { SectionWrapper } from "@/components/layouts/section-wrapper";
 import { solutions } from "@/data/solutions";
-import * as Icons from "lucide-react";
 import { ArrowRight, Check } from "lucide-react";
+import { getLucideIcon } from "@/lib/lucide-icon-map";
 
 export function SolutionsOverview() {
   const featuredSolutions = solutions.slice(0, 3);
@@ -58,9 +59,9 @@ export function SolutionsOverview() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {featuredSolutions.map((solution) => {
-          const IconComponent = (
-            Icons[solution.icon as keyof typeof Icons] || Icons.Server
-          ) as ComponentType<SVGProps<SVGSVGElement>>;
+          const IconComponent = getLucideIcon(solution.icon, Server) as ComponentType<
+            SVGProps<SVGSVGElement>
+          >;
 
           return (
             <div

@@ -1,10 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ComponentType, SVGProps } from "react";
+import type { LucideIcon } from "lucide-react";
 import { SectionWrapper } from "@/components/layouts/section-wrapper";
 import { services } from "@/data/services";
-import * as Icons from "lucide-react";
 import { ArrowRight } from "lucide-react";
+import { getLucideIcon } from "@/lib/lucide-icon-map";
 
 export function ServicesOverview() {
   const featuredServices = services.slice(0, 8);
@@ -62,9 +63,10 @@ export function ServicesOverview() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {featuredServices.map((service) => {
-          const IconComponent = (
-            Icons[service.icon as keyof typeof Icons] || Icons.Code
-          ) as ComponentType<SVGProps<SVGSVGElement>>;
+          const IconComponent = getLucideIcon(service.icon) as ComponentType<
+            SVGProps<SVGSVGElement>
+          > &
+            LucideIcon;
 
           return (
             <Link

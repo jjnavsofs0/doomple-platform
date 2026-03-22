@@ -2,8 +2,8 @@ import { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { solutions } from "@/data/solutions";
-import { ArrowRight, CheckCircle2, Zap, Shield, Settings2 } from "lucide-react";
-import * as Icons from "lucide-react";
+import { ArrowRight, BookOpen, CheckCircle2, Server, Settings2, Shield, Zap } from "lucide-react";
+import { getLucideIcon } from "@/lib/lucide-icon-map";
 
 export const metadata: Metadata = {
   title: "Ready-to-Deploy Software Solutions — EdTech, SaaS, E-Commerce & More | Doomple",
@@ -19,14 +19,8 @@ export const metadata: Metadata = {
   },
 };
 
-const iconMap: Record<string, any> = {
-  BookOpen: Icons.BookOpen, Server: Icons.Server, ShoppingCart: Icons.ShoppingCart,
-  Briefcase: Icons.Briefcase, Truck: Icons.Truck, Zap: Icons.Zap,
-  Users: Icons.Users, TrendingUp: Icons.TrendingUp, Code: Icons.Code,
-};
-
 function getIcon(iconName: string) {
-  return iconMap[iconName] || Icons.Code;
+  return getLucideIcon(iconName, Server);
 }
 
 const whyChoose = [
@@ -129,7 +123,7 @@ export default function SolutionsPage() {
                     <div className="flex items-start gap-4 mb-5">
                       <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: "rgba(26,191,173,0.12)" }}>
-                        <Icons.BookOpen className="w-6 h-6" style={{ color: "#1ABFAD" }} />
+                        <BookOpen className="w-6 h-6" style={{ color: "#1ABFAD" }} />
                       </div>
                       <div>
                         <span className="text-xs font-semibold px-2 py-0.5 rounded-full mb-2 inline-block"
@@ -176,7 +170,7 @@ export default function SolutionsPage() {
                     <div className="flex items-start gap-4 mb-5">
                       <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: "rgba(59,178,246,0.12)" }}>
-                        <Icons.Server className="w-6 h-6" style={{ color: "#3BB2F6" }} />
+                        <Server className="w-6 h-6" style={{ color: "#3BB2F6" }} />
                       </div>
                       <div>
                         <span className="text-xs font-semibold px-2 py-0.5 rounded-full mb-2 inline-block"

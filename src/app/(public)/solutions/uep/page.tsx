@@ -2,8 +2,8 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { solutions } from "@/data/solutions";
 import { uepModules } from "@/data/uep-modules";
-import { ArrowRight, CheckCircle2, Zap, Users, ChevronRight } from "lucide-react";
-import * as Icons from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronRight, Users, Zap } from "lucide-react";
+import { getLucideIcon } from "@/lib/lucide-icon-map";
 
 export const metadata: Metadata = {
   title: "Unified Education Platform (UEP) | Doomple Technologies",
@@ -20,23 +20,7 @@ export const metadata: Metadata = {
 };
 
 function getModuleIcon(iconName: string) {
-  const iconMap: Record<string, any> = {
-    BookOpen: Icons.BookOpen,
-    FileCheck: Icons.FileCheck,
-    Users: Icons.Users,
-    Brain: Icons.Brain,
-    Database: Icons.Database,
-    Code: Icons.Code,
-    Share2: Icons.Share2,
-    Image: Icons.Image,
-    BookPlus: Icons.BookPlus,
-    Trophy: Icons.Trophy,
-    BarChart3: Icons.BarChart3,
-    Video: Icons.Video,
-    Shield: Icons.Shield,
-    CheckCircle: Icons.CheckCircle,
-  };
-  return iconMap[iconName] || Icons.Code;
+  return getLucideIcon(iconName);
 }
 
 const stats = [

@@ -2,8 +2,8 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { solutions } from "@/data/solutions";
-import { ArrowRight, CheckCircle2, Zap, ChevronRight } from "lucide-react";
-import * as Icons from "lucide-react";
+import { ArrowRight, CheckCircle2, Layers, Zap, ChevronRight } from "lucide-react";
+import { getLucideIcon } from "@/lib/lucide-icon-map";
 
 // Pages with dedicated routes — skip dynamic rendering for these
 const DEDICATED_PAGES = ["uep", "saas-toolkit", "workforce"];
@@ -34,18 +34,7 @@ export async function generateMetadata({
 }
 
 function getIcon(iconName: string) {
-  const iconMap: Record<string, any> = {
-    BookOpen: Icons.BookOpen,
-    Server: Icons.Server,
-    ShoppingCart: Icons.ShoppingCart,
-    Briefcase: Icons.Briefcase,
-    Truck: Icons.Truck,
-    Zap: Icons.Zap,
-    Users: Icons.Users,
-    TrendingUp: Icons.TrendingUp,
-    Layers: Icons.Layers,
-  };
-  return iconMap[iconName] || Icons.Layers;
+  return getLucideIcon(iconName, Layers);
 }
 
 export default function SolutionDetailPage({

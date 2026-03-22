@@ -8,42 +8,94 @@ import { reportOperationalIssue } from "@/lib/operational-issues";
 const LOCAL_UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 type StorageVisibility = "public" | "private";
 
+function readEnvValue(name: string) {
+  const value = process.env[name];
+  if (!value) {
+    return "";
+  }
+
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+
+  return trimmed;
+}
+
 function sanitizeFileName(fileName: string) {
   return fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
 }
 
+function getStorageRegion() {
+  return readEnvValue("AWS_S3_REGION") || readEnvValue("AWS_REGION");
+}
+
+function getS3CredentialSource() {
+  const s3AccessKeyId = readEnvValue("AWS_S3_ACCESS_KEY_ID");
+  const s3SecretAccessKey = readEnvValue("AWS_S3_SECRET_ACCESS_KEY");
+  if (s3AccessKeyId && s3SecretAccessKey) {
+    return {
+      source: "AWS_S3_ACCESS_KEY_ID",
+      credentials: {
+        accessKeyId: s3AccessKeyId,
+        secretAccessKey: s3SecretAccessKey,
+      },
+    };
+  }
+
+  const awsAccessKeyId = readEnvValue("AWS_ACCESS_KEY_ID");
+  const awsSecretAccessKey = readEnvValue("AWS_SECRET_ACCESS_KEY");
+  if (awsAccessKeyId && awsSecretAccessKey) {
+    return {
+      source: "AWS_ACCESS_KEY_ID",
+      credentials: {
+        accessKeyId: awsAccessKeyId,
+        secretAccessKey: awsSecretAccessKey,
+      },
+    };
+  }
+
+  return {
+    source: "default-provider-chain",
+    credentials: undefined,
+  };
+}
+
 function getS3Client() {
-  if (!process.env.AWS_REGION) {
+  const region = getStorageRegion();
+  if (!region) {
     return null;
   }
 
+  const credentialConfig = getS3CredentialSource();
+
   return new S3Client({
-    region: process.env.AWS_REGION,
-    credentials:
-      process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
-        ? {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-          }
-        : undefined,
+    region,
+    credentials: credentialConfig.credentials,
   });
 }
 
 function getBucketName(visibility: StorageVisibility) {
   if (visibility === "public") {
-    return process.env.AWS_S3_PUBLIC_BUCKET || process.env.AWS_S3_BUCKET || "";
+    return readEnvValue("AWS_S3_PUBLIC_BUCKET") || readEnvValue("AWS_S3_BUCKET") || "";
   }
 
-  return process.env.AWS_S3_PRIVATE_BUCKET || process.env.AWS_S3_BUCKET || "";
+  return readEnvValue("AWS_S3_PRIVATE_BUCKET") || readEnvValue("AWS_S3_BUCKET") || "";
 }
 
 export function getStorageIntegrationStatus() {
+  const credentialConfig = getS3CredentialSource();
   return {
-    region: process.env.AWS_REGION || "",
+    region: getStorageRegion(),
     publicBucket: getBucketName("public"),
     privateBucket: getBucketName("private"),
     publicBucketConfigured: Boolean(getBucketName("public")),
     privateBucketConfigured: Boolean(getBucketName("private")),
+    credentialSource: credentialConfig.source,
+    explicitCredentialsConfigured: Boolean(credentialConfig.credentials),
   };
 }
 
@@ -64,6 +116,8 @@ export async function uploadFile(params: {
   const storageKey = `${params.folder}/${Date.now()}-${randomUUID()}-${safeName}`;
   const s3Client = getS3Client();
   const bucket = getBucketName(visibility);
+  const region = getStorageRegion();
+  const credentialConfig = getS3CredentialSource();
 
   if (s3Client && bucket) {
     try {
@@ -81,7 +135,7 @@ export async function uploadFile(params: {
         storageKey,
         url:
           visibility === "public"
-            ? `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${storageKey}`
+            ? `https://${bucket}.s3.${region}.amazonaws.com/${storageKey}`
             : "",
       };
     } catch (error) {
@@ -93,8 +147,10 @@ export async function uploadFile(params: {
         metadata: {
           storageKey,
           bucket,
+          region,
           visibility,
           fileName: params.fileName,
+          credentialSource: credentialConfig.source,
         },
       });
       console.warn(
@@ -150,6 +206,7 @@ export async function getStoredFileUrl(params: {
   if (params.provider === "s3-public" && params.storageKey) {
     const s3Client = getS3Client();
     const bucket = getBucketName("public");
+    const region = getStorageRegion();
     if (s3Client && bucket) {
       return getSignedUrl(
         s3Client,
@@ -161,8 +218,8 @@ export async function getStoredFileUrl(params: {
       );
     }
 
-    if (bucket && process.env.AWS_REGION) {
-      return `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${params.storageKey}`;
+    if (bucket && region) {
+      return `https://${bucket}.s3.${region}.amazonaws.com/${params.storageKey}`;
     }
   }
 

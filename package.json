@@ -6,7 +6,9 @@
     "node": "24.x"
   },
   "scripts": {
-    "dev": "unset NODE_ENV && next dev",
+    "clean": "node -e \"const fs=require('fs'); ['.next','.next-dev'].forEach((dir)=>fs.rmSync(dir,{ recursive:true, force:true }))\"",
+    "dev": "unset NODE_ENV && NEXT_DIST_DIR=.next-dev next dev",
+    "dev:reset": "node scripts/reset-next-dev.mjs",
     "prebuild": "node scripts/prisma-migrate-deploy-with-retry.mjs",
     "build": "unset NODE_ENV && prisma generate && next build",
     "start": "unset NODE_ENV && next start",
@@ -35,7 +37,6 @@
     "openai": "^6.32.0",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
-    "pusher": "^5.3.3",
     "pusher-js": "^8.4.3",
     "razorpay": "^2.9.6",
     "react": "^18.3.1",

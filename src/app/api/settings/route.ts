@@ -64,6 +64,8 @@ export async function GET() {
         s3PrivateBucket: storage.privateBucket,
         s3PublicBucketConfigured: storage.publicBucketConfigured,
         s3PrivateBucketConfigured: storage.privateBucketConfigured,
+        s3CredentialSource: storage.credentialSource,
+        s3ExplicitCredentialsConfigured: storage.explicitCredentialsConfigured,
         sesRegion: ses.region,
         sesFromEmail: ses.fromEmail,
         sesReplyToEmail: ses.replyToEmail,

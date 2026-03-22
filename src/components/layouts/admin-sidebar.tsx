@@ -198,6 +198,12 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
     }
   }, [canViewErrors, session?.user?.id]);
 
+  const handleSignOut = useCallback(() => {
+    void signOut({ callbackUrl: "/login" }).catch((error) => {
+      console.error("Admin sign out failed:", error);
+    });
+  }, []);
+
   useEffect(() => {
     void fetchSidebarCounts();
   }, [fetchSidebarCounts]);
@@ -388,7 +394,7 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
               <ChevronRight className="h-4 w-4" />
             </button>
             <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
+              onClick={handleSignOut}
               className="flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-white/70 transition-colors hover:bg-red-500/10 hover:text-red-300"
               aria-label="Logout"
             >
@@ -423,7 +429,7 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
                 Profile
               </Link>
               <button
-                onClick={() => signOut({ callbackUrl: "/login" })}
+                onClick={handleSignOut}
                 className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/70 transition-colors hover:bg-red-500/10 hover:text-red-300"
               >
                 Logout

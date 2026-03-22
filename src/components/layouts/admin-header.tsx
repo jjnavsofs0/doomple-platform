@@ -68,6 +68,12 @@ export function AdminHeader({
     );
   }, [pathname]);
 
+  const handleSignOut = () => {
+    void signOut({ callbackUrl: "/login" }).catch((error) => {
+      console.error("Admin sign out failed:", error);
+    });
+  };
+
   return (
     <header
       className={cn(
@@ -186,7 +192,7 @@ export function AdminHeader({
                     <button
                       onClick={() => {
                         setIsUserDropdownOpen(false);
-                        signOut({ callbackUrl: "/login" });
+                        handleSignOut();
                       }}
                       className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm text-red-600 transition-colors hover:bg-red-50"
                     >
