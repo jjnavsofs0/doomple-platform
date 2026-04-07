@@ -13,6 +13,7 @@ import {
   RefreshCcw,
   Search,
   Target,
+  Upload,
 } from "lucide-react"
 import { format } from "date-fns"
 import type { Lead, User } from "@prisma/client"
@@ -23,6 +24,7 @@ import { Select } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { Badge } from "@/components/ui/badge"
+import { LeadImportModal } from "@/components/admin/lead-import-modal"
 import { useAdminLiveRefetch } from "@/hooks/use-live-refetch"
 import { cn } from "@/lib/utils"
 
@@ -130,6 +132,7 @@ function LeadsPageContent() {
   const [summaryLoading, setSummaryLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState(currentSearch)
+  const [showImportModal, setShowImportModal] = useState(false)
 
   const updateSearchParams = useCallback(
     (updates: Record<string, string | null>) => {
@@ -343,6 +346,14 @@ function LeadsPageContent() {
                   New Lead
                 </Button>
               </Link>
+              <Button
+                variant="outline"
+                onClick={() => setShowImportModal(true)}
+                className="gap-2 border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+              >
+                <Upload className="h-4 w-4" />
+                Import
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => {
@@ -602,6 +613,15 @@ function LeadsPageContent() {
           </>
         )}
       </Card>
+      <LeadImportModal
+        open={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImported={() => {
+          setShowImportModal(false)
+          fetchLeads()
+          fetchSummary()
+        }}
+      />
     </div>
   )
 }

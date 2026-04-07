@@ -41,6 +41,11 @@ enum LeadSource {
   DIRECT
   PARTNER
   OTHER
+  FACEBOOK_ADS
+  GOOGLE_ADS
+  INSTAGRAM_ADS
+  LINKEDIN_ADS
+  CSV_IMPORT
 }
 
 enum LeadCategory {

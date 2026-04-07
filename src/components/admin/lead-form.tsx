@@ -49,6 +49,11 @@ const SOURCES = [
   { value: "CAMPAIGN", label: "Campaign" },
   { value: "DIRECT", label: "Direct" },
   { value: "PARTNER", label: "Partner" },
+  { value: "FACEBOOK_ADS", label: "Facebook Ads" },
+  { value: "GOOGLE_ADS", label: "Google Ads" },
+  { value: "INSTAGRAM_ADS", label: "Instagram Ads" },
+  { value: "LINKEDIN_ADS", label: "LinkedIn Ads" },
+  { value: "CSV_IMPORT", label: "CSV Import" },
   { value: "OTHER", label: "Other" },
 ];
 
