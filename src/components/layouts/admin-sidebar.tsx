@@ -147,6 +147,8 @@ const roleLabels: Record<string, string> = {
 export function AdminSidebar({ className }: AdminSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [openErrorCount, setOpenErrorCount] = useState(0);
+  const [newLeadsCount, setNewLeadsCount] = useState(0);
+  const [overdueInvoicesCount, setOverdueInvoicesCount] = useState(0);
   const [canScrollUp, setCanScrollUp] = useState(false);
   const [canScrollDown, setCanScrollDown] = useState(false);
   const pathname = usePathname();
@@ -178,25 +180,18 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
     : "A";
 
   const fetchSidebarCounts = useCallback(async () => {
-    if (!session?.user?.id || !canViewErrors) {
-      return;
-    }
-
+    if (!session?.user?.id) return;
     try {
-      const response = await fetch("/api/error-logs?status=open&limit=1", {
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        return;
-      }
-
+      const response = await fetch("/api/admin/badge-counts", { cache: "no-store" });
+      if (!response.ok) return;
       const result = await response.json();
-      setOpenErrorCount(Number(result?.summary?.openCount || 0));
+      setOpenErrorCount(Number(result.openErrors || 0));
+      setNewLeadsCount(Number(result.newLeads || 0));
+      setOverdueInvoicesCount(Number(result.overdueInvoices || 0));
     } catch {
-      // Keep the shell resilient even if the counters cannot be loaded.
+      // keep shell resilient
     }
-  }, [canViewErrors, session?.user?.id]);
+  }, [session?.user?.id]);
 
   const handleSignOut = useCallback(() => {
     void signOut({ callbackUrl: "/login" }).catch((error) => {
@@ -209,11 +204,9 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
   }, [fetchSidebarCounts]);
 
   useRealtimeSubscription({
-    channelName: session?.user?.id && canViewErrors ? ADMIN_GLOBAL_CHANNEL : null,
-    topics: ["errors", "notifications", "dashboard", "payments", "leads"],
-    onEvent: () => {
-      void fetchSidebarCounts();
-    },
+    channelName: session?.user?.id ? ADMIN_GLOBAL_CHANNEL : null,
+    topics: ["errors", "notifications", "dashboard", "payments", "leads", "invoices"],
+    onEvent: () => { void fetchSidebarCounts(); },
   });
 
   useEffect(() => {
@@ -298,7 +291,11 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
                   {group.items.map((item) => {
                     const Icon = item.icon;
                     const active = isActive(item.href);
-                    const badgeCount = item.href === "/admin/errors" ? openErrorCount : 0;
+                    const badgeCount =
+                      item.href === "/admin/errors" ? openErrorCount :
+                      item.href === "/admin/leads" ? newLeadsCount :
+                      item.href === "/admin/invoices" ? overdueInvoicesCount :
+                      0;
 
                     return (
                       <Link

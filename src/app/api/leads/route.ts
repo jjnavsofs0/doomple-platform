@@ -121,6 +121,84 @@ export async function POST(request: Request) {
       message: normalizedData.requirementsSummary,
     });
 
+    // --- Idempotency: check for existing lead by email ---
+    const existingLead = await prisma.lead.findFirst({
+      where: { email: { equals: normalizedData.email, mode: "insensitive" } },
+      include: {
+        assignedTo: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    if (existingLead) {
+      const terminalStatuses = ["LOST", "ON_HOLD"];
+      const isTerminal = terminalStatuses.includes(existingLead.status);
+
+      if (isTerminal) {
+        // Reopen the lead with fresh details
+        const reopened = await prisma.lead.update({
+          where: { id: existingLead.id },
+          data: {
+            status: "NEW",
+            fullName: normalizedData.fullName || existingLead.fullName,
+            phone: normalizedData.phone || existingLead.phone,
+            companyName: normalizedData.companyName || existingLead.companyName,
+            requirementsSummary: normalizedData.requirementsSummary || existingLead.requirementsSummary,
+            budgetRange: normalizedData.budgetRange || existingLead.budgetRange,
+            selectedService: normalizedData.selectedService || existingLead.selectedService,
+            source: normalizedData.source as any || existingLead.source,
+            priority: normalizedData.priority as any || existingLead.priority,
+            updatedAt: new Date(),
+          },
+          include: { assignedTo: { select: { id: true, name: true, email: true } } },
+        });
+
+        await prisma.leadActivity.create({
+          data: {
+            leadId: existingLead.id,
+            type: "REOPENED",
+            description: `Lead reopened from new inquiry. Previous status: ${existingLead.status}.${normalizedData.requirementsSummary ? ` New message: ${normalizedData.requirementsSummary}` : ""}`,
+            userId: session.user.id,
+          },
+        });
+
+        await notifyAdmins({
+          title: "Lead reopened",
+          message: `${reopened.fullName} submitted a new inquiry (was ${existingLead.status}).`,
+          type: "LEAD",
+          link: `/admin/leads/${reopened.id}`,
+          topics: ["dashboard", "leads", "notifications"],
+          email: true,
+          metadata: { leadId: reopened.id, previousStatus: existingLead.status },
+        });
+
+        return NextResponse.json(
+          { success: true, message: "Lead reopened from new inquiry", data: reopened, reopened: true },
+          { status: 200 }
+        );
+      }
+
+      // Active lead — attach a note with the new inquiry details
+      await prisma.leadActivity.create({
+        data: {
+          leadId: existingLead.id,
+          type: "NOTE",
+          description: `Duplicate inquiry received. ${normalizedData.requirementsSummary ? `Message: ${normalizedData.requirementsSummary}` : ""}${normalizedData.budgetRange ? ` Budget: ${normalizedData.budgetRange}` : ""}`.trim(),
+          userId: session.user.id,
+        },
+      });
+
+      return NextResponse.json(
+        {
+          success: true,
+          message: "Lead already exists and is active. New inquiry details noted.",
+          data: existingLead,
+          duplicate: true,
+        },
+        { status: 200 }
+      );
+    }
+    // --- end idempotency check ---
+
     const lead = await prisma.lead.create({
       data: {
         fullName: normalizedData.fullName,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminSession } from "@/lib/admin-auth";
 import { setAppErrorResolution } from "@/lib/app-error-log";
+import { broadcastAdminRefresh } from "@/lib/realtime";
 
 const ADMIN_ERROR_ROLES = ["SUPER_ADMIN", "ADMIN"];
 
@@ -31,6 +32,8 @@ export async function PATCH(
       isResolved: body.isResolved,
       resolvedById: auth.session.user.id,
     });
+
+    void broadcastAdminRefresh(["errors"]);
 
     return NextResponse.json({
       success: true,

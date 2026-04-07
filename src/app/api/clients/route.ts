@@ -142,6 +142,24 @@ export async function POST(request: Request) {
       );
     }
 
+    // Phone uniqueness check (if phone provided)
+    if (validatedData.phone) {
+      const clientWithPhone = await prisma.client.findFirst({
+        where: { phone: validatedData.phone, isActive: true },
+        select: { id: true, companyName: true, contactName: true, email: true },
+      });
+      if (clientWithPhone) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `A client with this phone number already exists: ${clientWithPhone.companyName || clientWithPhone.contactName || clientWithPhone.email}`,
+            existingClientId: clientWithPhone.id,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     const clientData: Prisma.ClientCreateInput = {
       type: body.type || "company",
       companyName: validatedData.company,
