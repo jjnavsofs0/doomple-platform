@@ -39,6 +39,10 @@ export function useRealtimeSubscription({
     const allowedTopics = topics || [];
     const handleSubscriptionError = (error: unknown) => {
       const message = getClientErrorMessage(error, "Realtime subscription failed");
+      // "Existing subscription" fires on React StrictMode double-mount — not a real error
+      if (message.toLowerCase().includes("existing subscription")) {
+        return;
+      }
       void reportClientError({
         title: "Realtime subscription failed",
         message,

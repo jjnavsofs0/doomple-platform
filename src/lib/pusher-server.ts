@@ -59,8 +59,8 @@ function getPusherConfig() {
   const cluster = readEnvValue("PUSHER_CLUSTER") || readEnvValue("NEXT_PUBLIC_PUSHER_CLUSTER");
 
   if (!appId || !key || !secret || !cluster) {
-    pusherConfig = null;
-    return pusherConfig;
+    // Don't cache null — env vars may be added on next deploy/cold-start
+    return null;
   }
 
   pusherConfig = {

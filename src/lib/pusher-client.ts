@@ -13,7 +13,10 @@ let unavailableTimer: number | null = null;
 let unavailableReported = false;
 
 const UNAVAILABLE_WARNING_DELAY_MS = 15000;
-const TRANSIENT_PUSHER_ERROR_CODES = new Set([1006, 4201]);
+// 4200: generic temporary error (server asks client to reconnect immediately)
+// 4201: slow client reconnect (server asks client to reconnect after 1s)
+// 1006: abnormal closure (network blip)
+const TRANSIENT_PUSHER_ERROR_CODES = new Set([1006, 4200, 4201]);
 
 type SerializableRecord = Record<string, unknown>;
 
@@ -85,7 +88,10 @@ function isTransientConnectionError(error: unknown) {
 
   return (
     (typeof code === "number" && TRANSIENT_PUSHER_ERROR_CODES.has(code)) ||
-    message.includes("pong reply not received")
+    message.includes("pong reply not received") ||
+    // Invalid signature fires when PUSHER_SECRET env var is wrong — not a client-side bug
+    message.includes("invalid signature") ||
+    message.includes("existing subscription")
   );
 }
 
