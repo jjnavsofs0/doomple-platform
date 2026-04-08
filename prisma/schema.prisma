@@ -256,6 +256,7 @@ model User {
   projectNotes              ProjectNote[]
   projectStatusChanges      ProjectStatusHistory[]
   clientCommunications      ClientCommunication[]
+  leadCommunications        LeadCommunication[]
   createdQuotations         Quotation[]
   createdInvoices           Invoice[]
   fileAttachments           FileAttachment[]
@@ -411,6 +412,7 @@ model Lead {
   // Relations
   notes               LeadNote[]
   activities          LeadActivity[]
+  communications      LeadCommunication[]
   quotations          Quotation[]
   projects            Project[]     @relation("ProjectLead")
   chatbotConversations ChatbotConversation[]
@@ -454,6 +456,26 @@ model LeadActivity {
   lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
   userId      String?
   user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([leadId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model LeadCommunication {
+  id        String    @id @default(cuid())
+  type      String    // call, email, whatsapp, meeting, demo, linkedin, sms, note
+  direction String?   // inbound, outbound
+  subject   String?
+  content   String    @db.Text
+  outcome   String?   // interested, follow_up, not_interested, no_answer, deal_closed
+  createdAt DateTime  @default(now())
+
+  // Foreign Keys
+  leadId    String
+  lead      Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([leadId])
   @@index([userId])

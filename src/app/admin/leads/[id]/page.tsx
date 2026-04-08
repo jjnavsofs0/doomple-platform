@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
   ArrowLeft,
@@ -12,6 +12,7 @@ import {
   Phone,
   Plus,
   Target,
+  Trash2,
   UserRound,
 } from "lucide-react"
 import { format } from "date-fns"
@@ -27,6 +28,7 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/components/ui/toast"
 import { LeadPipeline } from "@/components/admin/lead-pipeline"
 import { ActivityTimeline } from "@/components/admin/activity-timeline"
+import { AttachmentManager } from "@/components/admin/attachment-manager"
 
 interface LeadWithRelations extends Lead {
   assignedTo: User | null
@@ -206,8 +208,19 @@ export default function LeadDetailPage() {
   const [isAddingNote, setIsAddingNote] = useState(false)
   const [activeTab, setActiveTab] = useState("overview")
   const [users, setUsers] = useState<Array<{ id: string; name: string; role: string; isActive: boolean }>>([])
+  // Communications
+  const [communications, setCommunications] = useState<any[]>([])
+  const [commFormOpen, setCommFormOpen] = useState(false)
+  const [commType, setCommType] = useState("call")
+  const [commDirection, setCommDirection] = useState("outbound")
+  const [commSubject, setCommSubject] = useState("")
+  const [commContent, setCommContent] = useState("")
+  const [commOutcome, setCommOutcome] = useState("")
+  const [isAddingComm, setIsAddingComm] = useState(false)
+  // Quotations
+  const [quotations, setQuotations] = useState<any[]>([])
 
-  const fetchLead = async () => {
+  const fetchLead = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -220,11 +233,33 @@ export default function LeadDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [leadId])
+
+  const fetchCommunications = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/leads/${leadId}/communications`, { cache: "no-store" })
+      if (res.ok) {
+        const json = await res.json()
+        setCommunications(json.data || [])
+      }
+    } catch {}
+  }, [leadId])
+
+  const fetchQuotations = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/quotations?leadId=${leadId}&limit=50`, { cache: "no-store" })
+      if (res.ok) {
+        const json = await res.json()
+        setQuotations(json.data || [])
+      }
+    } catch {}
+  }, [leadId])
 
   useEffect(() => {
-    fetchLead()
-  }, [leadId])
+    void fetchLead()
+    void fetchCommunications()
+    void fetchQuotations()
+  }, [fetchLead, fetchCommunications, fetchQuotations])
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -306,6 +341,42 @@ export default function LeadDetailPage() {
     } finally {
       setIsAddingNote(false)
     }
+  }
+
+  const handleAddCommunication = async () => {
+    if (!commContent.trim()) return
+    setIsAddingComm(true)
+    try {
+      const res = await fetch(`/api/leads/${leadId}/communications`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: commType,
+          direction: commDirection,
+          subject: commSubject || undefined,
+          content: commContent,
+          outcome: commOutcome || undefined,
+        }),
+      })
+      if (!res.ok) throw new Error("Failed to log communication")
+      setCommContent("")
+      setCommSubject("")
+      setCommOutcome("")
+      setCommFormOpen(false)
+      void fetchCommunications()
+      toast({ type: "success", title: "Communication logged" })
+    } catch (err) {
+      toast({ type: "error", title: "Could not log communication", description: err instanceof Error ? err.message : "Unknown error" })
+    } finally {
+      setIsAddingComm(false)
+    }
+  }
+
+  const handleDeleteCommunication = async (commId: string) => {
+    try {
+      await fetch(`/api/leads/${leadId}/communications/${commId}`, { method: "DELETE" })
+      void fetchCommunications()
+    } catch {}
   }
 
   const handleConvertToClient = async () => {
@@ -564,7 +635,9 @@ export default function LeadDetailPage() {
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="flex h-auto flex-wrap gap-2 bg-transparent p-0">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="comms">Communications ({communications.length})</TabsTrigger>
                   <TabsTrigger value="notes">Notes ({lead.notes.length})</TabsTrigger>
+                  <TabsTrigger value="documents">Documents</TabsTrigger>
                   <TabsTrigger value="activity">Activity ({lead.activities.length})</TabsTrigger>
                 </TabsList>
 
@@ -644,6 +717,38 @@ export default function LeadDetailPage() {
                     </div>
                   ) : null}
 
+                  {quotations.length > 0 && (
+                    <div className="rounded-3xl border border-[#E7EEF6] bg-[#F8FBFF] px-5 py-5">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#4B6B88]">
+                          Linked Quotations ({quotations.length})
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/admin/quotations/new?leadId=${leadId}${lead.convertedClientId ? `&clientId=${lead.convertedClientId}` : ""}`)}
+                        >
+                          + New Quotation
+                        </Button>
+                      </div>
+                      <div className="mt-4 space-y-2">
+                        {quotations.map((q: any) => (
+                          <button
+                            key={q.id}
+                            onClick={() => router.push(`/admin/quotations/${q.id}`)}
+                            className="flex w-full items-center justify-between rounded-2xl border border-[#E7EEF6] bg-white px-4 py-3 text-left transition hover:border-[#1ABFAD]/30 hover:bg-[#F3FCF9]"
+                          >
+                            <span className="text-sm font-medium text-[#042042]">{q.quotationNumber}</span>
+                            <div className="flex items-center gap-3">
+                              <StatusBadge status={q.status} />
+                              <span className="text-sm text-[#6B7280]">₹{Number(q.total).toLocaleString("en-IN")}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="rounded-3xl border border-[#E7EEF6] bg-[#F8FBFF] px-5 py-5">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#4B6B88]">
                       Requirements Summary
@@ -652,6 +757,133 @@ export default function LeadDetailPage() {
                       {lead.requirementsSummary || "No requirements summary captured yet."}
                     </p>
                   </div>
+                </TabsContent>
+
+                <TabsContent value="comms" className="space-y-4 pt-6">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-[#042042]">Communication Log</p>
+                    <Button variant="outline" className="gap-2" onClick={() => setCommFormOpen((v) => !v)}>
+                      <Plus className="h-4 w-4" />
+                      Log Entry
+                    </Button>
+                  </div>
+
+                  {commFormOpen && (
+                    <div className="rounded-3xl border border-[#E7EEF6] bg-[#F8FBFF] p-5 space-y-4">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-[#042042]">Type</label>
+                          <Select value={commType} onValueChange={setCommType} className="h-10 rounded-2xl border-[#DDE8F2] bg-white">
+                            <option value="call">📞 Call</option>
+                            <option value="email">✉️ Email</option>
+                            <option value="whatsapp">💬 WhatsApp</option>
+                            <option value="meeting">🤝 Meeting</option>
+                            <option value="demo">🖥️ Demo</option>
+                            <option value="linkedin">💼 LinkedIn</option>
+                            <option value="sms">📱 SMS</option>
+                            <option value="note">📝 Note</option>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="mb-2 block text-sm font-medium text-[#042042]">Direction</label>
+                          <Select value={commDirection} onValueChange={setCommDirection} className="h-10 rounded-2xl border-[#DDE8F2] bg-white">
+                            <option value="outbound">Outbound (we reached out)</option>
+                            <option value="inbound">Inbound (they reached out)</option>
+                          </Select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-[#042042]">Subject (optional)</label>
+                        <input
+                          type="text"
+                          value={commSubject}
+                          onChange={(e) => setCommSubject(e.target.value)}
+                          placeholder="e.g. Discovery call — pricing discussion"
+                          className="h-10 w-full rounded-2xl border border-[#DDE8F2] bg-white px-4 text-sm text-[#042042] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1ABFAD]/30"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-[#042042]">Notes *</label>
+                        <Textarea
+                          placeholder="What was discussed? Key points, objections, next steps..."
+                          value={commContent}
+                          onChange={(e) => setCommContent(e.target.value)}
+                          rows={4}
+                          className="rounded-2xl border-[#DDE8F2] bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-[#042042]">Outcome (optional)</label>
+                        <Select value={commOutcome} onValueChange={setCommOutcome} className="h-10 rounded-2xl border-[#DDE8F2] bg-white">
+                          <option value="">Select outcome...</option>
+                          <option value="interested">Interested — moving forward</option>
+                          <option value="follow_up">Needs follow-up</option>
+                          <option value="not_interested">Not interested</option>
+                          <option value="no_answer">No answer</option>
+                          <option value="deal_closed">Deal closed</option>
+                        </Select>
+                      </div>
+                      <div className="flex justify-end gap-3">
+                        <Button variant="outline" onClick={() => setCommFormOpen(false)}>Cancel</Button>
+                        <Button onClick={handleAddCommunication} disabled={isAddingComm || !commContent.trim()}>
+                          {isAddingComm ? "Saving..." : "Save Entry"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {communications.length > 0 ? (
+                    <div className="space-y-3">
+                      {communications.map((comm: any) => (
+                        <div key={comm.id} className="rounded-3xl border border-[#E7EEF6] bg-white px-5 py-5">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-semibold text-[#042042]">
+                                  {comm.subject || (comm.type.charAt(0).toUpperCase() + comm.type.slice(1))}
+                                </span>
+                                <Badge variant="outline" className="capitalize">{comm.type}</Badge>
+                                {comm.direction && (
+                                  <Badge variant="outline" className="capitalize text-[#6B7280]">{comm.direction}</Badge>
+                                )}
+                                {comm.outcome && (
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      comm.outcome === "interested" || comm.outcome === "deal_closed"
+                                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                        : comm.outcome === "not_interested"
+                                        ? "border-red-200 bg-red-50 text-red-700"
+                                        : "border-amber-200 bg-amber-50 text-amber-700"
+                                    }
+                                  >
+                                    {comm.outcome.replace(/_/g, " ")}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-[#6B7280]">
+                                {formatDate(comm.createdAt, "dd MMM yyyy h:mm a")}
+                                {comm.user?.name ? ` · ${comm.user.name}` : ""}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => void handleDeleteCommunication(comm.id)}
+                              className="rounded-xl p-1.5 text-[#9CA3AF] transition hover:bg-red-50 hover:text-red-500"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[#4B5563]">{comm.content}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      title="No communications logged"
+                      description="Log calls, emails, meetings, and demos to build a full interaction history for this lead."
+                    />
+                  )}
                 </TabsContent>
 
                 <TabsContent value="notes" className="space-y-4 pt-6">
@@ -701,6 +933,10 @@ export default function LeadDetailPage() {
                       description="Add the first note to capture qualification context, objections, or the next planned touchpoint."
                     />
                   )}
+                </TabsContent>
+
+                <TabsContent value="documents" className="pt-6">
+                  <AttachmentManager entityType="lead" entityId={leadId} />
                 </TabsContent>
 
                 <TabsContent value="activity" className="pt-6">
@@ -834,6 +1070,7 @@ export default function LeadDetailPage() {
                 <SnapshotMetric label="Owner" value={lead.assignedTo?.name || "Unassigned"} />
                 <SnapshotMetric label="Last Updated" value={formatDate(lead.updatedAt)} />
                 <SnapshotMetric label="Notes Logged" value={`${lead.notes.length}`} tone="warm" />
+                <SnapshotMetric label="Comms Logged" value={`${communications.length}`} tone="warm" />
                 <SnapshotMetric
                   label="Conversion"
                   value={isConverted ? "Linked to client" : "Not converted"}
