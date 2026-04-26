@@ -1,5 +1,6 @@
 // Public landing page components
 export { HeroSection } from "./hero-section";
+export { AgenticAiSpotlight } from "./agentic-ai-spotlight";
 export { ClientStrip } from "./client-strip";
 export { ServicesOverview } from "./services-overview";
 export { SolutionsOverview } from "./solutions-overview";

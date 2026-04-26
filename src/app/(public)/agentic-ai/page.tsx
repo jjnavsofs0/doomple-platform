@@ -135,56 +135,92 @@ const proofPoints = [
 export default function AgenticAiPage() {
   return (
     <div className="min-h-screen bg-[#F9FAFB]">
-      <section className="relative min-h-[680px] overflow-hidden bg-[#042042]">
-        <Image
-          src="/images/people/services-overview.jpg"
-          alt="A business team planning AI automation workflows in a workshop"
-          fill
-          priority
-          className="object-cover object-center opacity-35"
+      <section className="relative overflow-hidden bg-[#042042] py-16 sm:py-20 lg:py-24">
+        <div className="absolute inset-0 bg-dot-pattern opacity-30" />
+        <div
+          className="absolute right-0 top-0 h-[520px] w-[520px] pointer-events-none"
+          style={{ background: "radial-gradient(ellipse at top right, rgba(26,191,173,0.16) 0%, transparent 65%)" }}
         />
-        <div className="absolute inset-0 bg-[#042042]/78" />
-        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#F9FAFB] to-transparent" />
 
-        <div className="relative z-10 mx-auto flex min-h-[680px] max-w-7xl flex-col justify-center px-4 pb-24 pt-20 sm:px-6 lg:px-8">
-          <div className="max-w-4xl">
-            <p className="eyebrow mb-4">Agentic AI Automation</p>
-            <h1 className="max-w-4xl text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">
-              AI agents that do the busywork your team keeps postponing
-            </h1>
-            <p className="mt-6 max-w-2xl text-base leading-8 text-white/70 sm:text-lg">
-              Doomple builds practical business agents for Indian SMEs, startups and professional firms:
-              WhatsApp lead bots, document agents, proposal agents, compliance monitors and multi-step workflow automation.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/contact"
-                className="inline-flex items-center justify-center gap-2 rounded-lg px-7 py-3.5 text-sm font-semibold text-white transition-all duration-200"
-                style={{ backgroundColor: "#1ABFAD" }}
-              >
-                Book an Agentic AI Call <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/services/agentic-ai-automation"
-                className="inline-flex items-center justify-center gap-2 rounded-lg px-7 py-3.5 text-sm font-semibold text-white/85 transition-all duration-200"
-                style={{ border: "1.5px solid rgba(255,255,255,0.24)" }}
-              >
-                View Service Details
-              </Link>
-            </div>
-          </div>
-
-          <div className="mt-14 grid max-w-5xl gap-3 sm:grid-cols-3">
-            {[
-              { value: "1", label: "workflow picked for ROI" },
-              { value: "2-4", label: "weeks to a usable pilot" },
-              { value: "Human", label: "approval for sensitive steps" },
-            ].map((item) => (
-              <div key={item.label} className="border border-white/15 bg-white/10 px-5 py-4 backdrop-blur-sm">
-                <p className="text-2xl font-bold text-white">{item.value}</p>
-                <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-white/52">{item.label}</p>
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-10 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
+            <div>
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#1ABFAD]/30 bg-[#1ABFAD]/10 px-4 py-1.5 text-sm font-semibold text-[#7CE6DA]">
+                <Bot className="h-4 w-4" />
+                Agentic AI Automation
               </div>
-            ))}
+              <h1 className="max-w-4xl text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">
+                AI agents for WhatsApp, documents, sales, and operations
+              </h1>
+              <p className="mt-6 max-w-2xl text-base leading-8 text-white/75 sm:text-lg">
+                Build secure agents that qualify leads, read documents, draft proposals, monitor changes
+                and complete repeatable workflows with human approval where it matters.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href="/contact"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg px-7 py-3.5 text-sm font-semibold text-white transition-all duration-200"
+                  style={{ backgroundColor: "#1ABFAD" }}
+                >
+                  Book an Agentic AI Call <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  href="#use-cases"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-7 py-3.5 text-sm font-semibold text-[#042042] transition-all duration-200"
+                >
+                  See Use Cases
+                </Link>
+              </div>
+
+              <div className="mt-10 grid gap-3 sm:grid-cols-2">
+                {[
+                  "Start with one painful workflow instead of an open-ended AI transformation.",
+                  "Keep audit logs, approval checkpoints and role-based access from day one.",
+                ].map((item) => (
+                  <div key={item} className="rounded-lg border border-white/10 bg-[#0A2C54] p-4 text-sm leading-6 text-white/80">
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="relative">
+              <div className="overflow-hidden rounded-[24px] border border-white/10 bg-[#0A2C54] shadow-[0_28px_80px_rgba(0,0,0,0.28)]">
+                <Image
+                  src="/images/people/services-overview.jpg"
+                  alt="A business team planning AI automation workflows in a workshop"
+                  width={1600}
+                  height={1067}
+                  priority
+                  className="h-[340px] w-full object-cover object-center opacity-95 sm:h-[410px]"
+                />
+                <div className="grid gap-0 border-t border-white/10 bg-[#042042] sm:grid-cols-2">
+                  {[
+                    { label: "Business inputs", value: "WhatsApp, email, docs" },
+                    { label: "Agent actions", value: "Draft, classify, update" },
+                    { label: "Control layer", value: "Approval and audit logs" },
+                    { label: "Outcome", value: "Saved hours every week" },
+                  ].map((item) => (
+                    <div key={item.label} className="border-b border-white/10 px-5 py-4 sm:border-r">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7CE6DA]">{item.label}</p>
+                      <p className="mt-1 text-sm font-semibold text-white">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                {[
+                  { value: "1", label: "workflow selected" },
+                  { value: "2-4", label: "week pilot" },
+                  { value: "Human", label: "approval first" },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-lg bg-white px-4 py-4 shadow-[0_12px_35px_rgba(4,32,66,0.16)]">
+                    <p className="text-2xl font-bold text-[#042042]">{item.value}</p>
+                    <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#6B7280]">{item.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -208,7 +244,7 @@ export default function AgenticAiPage() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-20">
+      <section id="use-cases" className="py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-10 max-w-3xl">
             <p className="eyebrow mb-3">Use Cases by Profession</p>
@@ -345,7 +381,7 @@ export default function AgenticAiPage() {
               return (
                 <div key={item.text} className="flex items-start gap-4 border border-white/10 bg-white/5 p-5">
                   <Icon className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#1ABFAD]" />
-                  <p className="text-sm leading-6 text-white/76">{item.text}</p>
+                  <p className="text-sm leading-6 text-white/75">{item.text}</p>
                 </div>
               );
             })}
