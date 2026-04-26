@@ -92,6 +92,14 @@ const SALES_SCOPE_KEYWORDS = [
   "api",
   "integration",
   "automation",
+  "agentic ai",
+  "ai agent",
+  "ai agents",
+  "workflow agent",
+  "whatsapp agent",
+  "document agent",
+  "proposal agent",
+  "lead agent",
   "crm",
   "erp",
   "ai",
@@ -227,6 +235,18 @@ const HARD_GUARDRAILS = [
   "Once you understand the project type and the main goal or pain point, stop extending discovery and ask for the minimum lead handoff details.",
   "For sales handoff, prefer asking only for name and best email in one short message.",
 ];
+
+const AGENTIC_AI_PLAYBOOK = [
+  "Doomple service: Agentic AI Automation.",
+  "Positioning: secure AI agents that execute repeatable business workflows across WhatsApp, email, CRM, spreadsheets, documents, accounting tools, ad platforms, CMS, and internal systems with human approval where risk is high.",
+  "Best first-agent rule: recommend one narrow workflow where inputs are repetitive, outputs are reviewable, and success can be measured in saved hours, faster response time, fewer missed follow-ups, or lower rework.",
+  "Common first pilots: WhatsApp lead qualification, document classification and extraction, invoice/GST reconciliation prep, proposal or quote drafting, meeting notes to follow-ups, weekly regulatory or competitor briefing, campaign reporting, SEO content-decay alerts, vendor quote comparison, and event vendor/RFP tracking.",
+  "Audience mapping: CAs often fit GST/document/notice-response agents; lawyers fit intake, research, and contract-review support; traders and distributors fit vendor comparison, reconciliation, and demand/signal briefs; advertisers fit reporting, creative-variant, and lead-nurture agents; SEO agencies fit content pipeline, technical SEO, and refresh-alert agents; event planners fit vendor procurement, timelines, and attendee personalization agents; SMEs fit WhatsApp lead, support, invoice/OCR, hiring, and founder chief-of-staff agents.",
+  "Safe architecture to mention when relevant: knowledge base, tool permissions, role-based access, action logs, human approval checkpoints, fallback paths, monitoring, and continuous improvement.",
+  "Discovery flow for Agentic AI: first ask what workflow they hate repeating or want to speed up; then identify current tools/channels involved; then ask what action the agent should prepare or execute; then ask what must stay human-approved; then ask for name and best email if they want a pilot or consultation.",
+  "Decision help: if the workflow touches money, legal commitments, tax filings, customer promises, or regulated decisions, recommend a human-in-the-loop pilot instead of full autonomy.",
+  "Do not promise fixed ROI, autonomous execution, legal/tax/financial advice, or guaranteed accuracy. Frame outcomes as measurable pilot goals.",
+].join("\n");
 
 function getNonEmptyString(value: unknown, fallback: string) {
   if (typeof value !== "string") {
@@ -1005,6 +1025,9 @@ function buildPromptContext(params: {
           .join("\n\n")
       : "No knowledge snippets were found.",
     "</knowledge_context>",
+    "<agentic_ai_playbook>",
+    AGENTIC_AI_PLAYBOOK,
+    "</agentic_ai_playbook>",
     "<conversation_history>",
     params.history.length
       ? params.history.map((item) => `${item.role.toUpperCase()}: ${item.content}`).join("\n")
@@ -1065,6 +1088,10 @@ function buildPromptContext(params: {
     "- Ask for budget and timeline later in the conversation, after the project scope is clearer.",
     "- If the visitor asks whether Doomple can help with something, answer that clearly first before collecting data.",
     "- When appropriate, suggest a likely-fit service or solution before asking for more details.",
+    "- For Agentic AI inquiries, help the visitor decide whether their workflow is a good first-agent candidate. Focus on one workflow, tools involved, review/approval needs, and measurable outcome.",
+    "- For Agentic AI inquiries, suggest a relevant first pilot based on their profession or business type, then ask only one focused next question.",
+    "- For Agentic AI inquiries, prefer practical language like 'workflow agent', 'WhatsApp lead agent', 'document ops agent', or 'proposal agent' over abstract AI jargon.",
+    "- If the visitor asks whether an AI agent can fully replace a person for legal, tax, finance, trading, or customer-commitment decisions, recommend human review and approval rather than full autonomy.",
     "- Prefer grouped, low-friction prompts like 'Could you share your name and best email?' instead of a long numbered checklist.",
     "- Once enough context exists, ask for the remaining essentials in the smallest possible next step.",
     "- If the visitor asks for an estimate or recommendation, give a directional answer first, then ask only the next 1 or 2 highest-leverage details needed to refine it.",

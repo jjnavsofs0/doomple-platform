@@ -44,6 +44,7 @@ function isHighIntentPath(pathname: string) {
   return [
     /^\/pricing(?:\/|$)/i,
     /^\/contact(?:\/|$)/i,
+    /^\/agentic-ai(?:\/|$)/i,
     /^\/services(?:\/|$)/i,
     /^\/solutions(?:\/|$)/i,
     /^\/book(?:\/|$)/i,
@@ -52,6 +53,10 @@ function isHighIntentPath(pathname: string) {
 }
 
 function getSalesPrompt(pathname: string, fallback: string) {
+  if (/^\/agentic-ai(?:\/|$)/i.test(pathname)) {
+    return "Thinking about AI agents? Tell me one workflow your team repeats often and I’ll help decide if it’s a good first automation pilot.";
+  }
+
   if (/^\/pricing(?:\/|$)/i.test(pathname)) {
     return "Working out scope or price? Tell me what you want to build and I can suggest the right engagement model and next step.";
   }
@@ -72,6 +77,10 @@ function getSalesPrompt(pathname: string, fallback: string) {
 }
 
 function getInputPlaceholder(pathname: string) {
+  if (/^\/agentic-ai(?:\/|$)/i.test(pathname)) {
+    return "Describe one workflow you want an AI agent to handle...";
+  }
+
   if (/^\/pricing(?:\/|$)/i.test(pathname)) {
     return "Describe the project or budget question you have...";
   }
