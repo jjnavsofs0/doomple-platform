@@ -76,6 +76,43 @@ We build agents specifically tailored to your domain—whether that's customer s
   },
 
   {
+    slug: 'agentic-ai-automation',
+    title: 'Agentic AI Automation',
+    shortDescription: 'Agentic AI automation for Indian SMEs, startups and professional firms — build secure AI agents that execute WhatsApp, document, sales, compliance and operations workflows with human approval.',
+    description: `Agentic AI moves beyond simple chatbots into systems that can plan, use tools, remember business context, and complete multi-step workflows under the right controls. Doomple builds production-minded AI agents for Indian SMEs, startups, CAs, lawyers, advertisers, SEO agencies, traders, distributors and event businesses that want measurable productivity gains without risky black-box automation.
+
+Our approach starts with one workflow that already costs your team time: lead qualification on WhatsApp, invoice and GST reconciliation, proposal drafting, document classification, meeting follow-ups, vendor comparison, campaign reporting, content refresh monitoring, or client briefing preparation. We map the workflow, define success metrics, connect the agent to approved tools and data, and keep human review where accuracy, money, legal exposure or customer commitments matter.
+
+Every agent is designed with operational safety in mind. We implement role-based access, retrieval from approved knowledge sources, action logs, approval checkpoints, fallback handling, performance monitoring and continuous improvement loops. The result is not an AI demo that works once, but a practical business automation layer your team can trust, measure and expand over time.`,
+    icon: 'Cpu',
+    problemsSolved: [
+      'Repetitive follow-ups, document checks and status updates consuming senior team time',
+      'Leads arriving through WhatsApp, calls and forms without consistent qualification or CRM capture',
+      'Manual invoice, GST, proposal, reporting and research workflows that delay client delivery',
+      'AI experiments that do not connect to real business tools or produce measurable ROI',
+      'Concern about letting AI take action without audit logs, permissions and human approval',
+    ],
+    idealClients: [
+      'SMEs and startups that want to automate one high-friction workflow first',
+      'CAs, lawyers, consultants and agencies handling repetitive document or client-service work',
+      'Sales, marketing and operations teams that rely on WhatsApp, spreadsheets, CRM and email',
+    ],
+    deliverables: [
+      'Agentic AI workflow audit and automation roadmap',
+      'Working AI agent connected to approved tools, data sources and communication channels',
+      'Prompt, tool-use, retrieval and approval architecture',
+      'Monitoring dashboard with logs, outcomes and improvement backlog',
+      'Team training, handover documentation and optimisation support',
+    ],
+    engagementOptions: [
+      'One-week agentic AI audit with prioritised use-case roadmap',
+      'Two-week workflow agent pilot for one measurable business process',
+      'Custom multi-step agent build with integrations, governance and ongoing optimisation',
+    ],
+    isMarketingOnly: false
+  },
+
+  {
     slug: 'mobile-app-development',
     title: 'Mobile App Development',
     shortDescription: 'Mobile app development company in India — native iOS & Android and cross-platform apps for startups, SMEs and enterprises, built for performance and scale.',

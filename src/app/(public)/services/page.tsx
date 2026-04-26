@@ -25,7 +25,7 @@ const categoryConfig: Record<string, { slugs: string[]; color: string }> = {
     color: "#1ABFAD",
   },
   "AI & Data": {
-    slugs: ["ai-chatbots-agents", "data-analytics", "data-engineering", "ai-model-training", "ai-consulting", "ai-data-training"],
+    slugs: ["agentic-ai-automation", "ai-chatbots-agents", "data-analytics", "data-engineering", "ai-model-training", "ai-consulting", "ai-data-training"],
     color: "#3BB2F6",
   },
   "Infrastructure & Operations": {

@@ -39,6 +39,7 @@ export function PublicHeader({ className }: PublicHeaderProps) {
   ];
 
   const aiDataDropdown = [
+    { label: "Agentic AI Automation", href: "/agentic-ai" },
     { label: "Data Analytics & BI", href: "/services/data-analytics" },
     { label: "Data Engineering", href: "/services/data-engineering" },
     { label: "AI Model Training", href: "/services/ai-model-training" },

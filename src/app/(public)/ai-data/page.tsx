@@ -21,6 +21,16 @@ export const metadata: Metadata = {
 
 const aiServices = [
   {
+    slug: "agentic-ai-automation",
+    icon: Cpu,
+    title: "Agentic AI Automation",
+    description:
+      "Secure AI agents that plan, use tools and execute repeatable business workflows across WhatsApp, CRM, email, documents, spreadsheets and internal systems with human approval.",
+    highlights: ["Workflow agent pilots", "WhatsApp business agents", "Human-in-the-loop controls"],
+    color: "#1ABFAD",
+    href: "/agentic-ai",
+  },
+  {
     slug: "data-analytics",
     icon: BarChart3,
     title: "Data Analytics & Business Intelligence",
@@ -158,7 +168,7 @@ export default function AiDataPage() {
           <div className="mb-12">
             <p className="eyebrow mb-3">Our AI & Data Services</p>
             <h2 className="text-3xl sm:text-4xl font-bold text-[#042042] leading-tight">
-              Six Ways We Deliver AI Value
+              Seven Ways We Deliver AI Value
             </h2>
             <p className="mt-3 text-[#6B7280] text-base max-w-2xl">
               Each service is a standalone capability or part of a broader AI transformation engagement — designed to integrate with your existing stack and team.
@@ -168,6 +178,7 @@ export default function AiDataPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {aiServices.map((svc) => {
               const Icon = svc.icon;
+              const serviceHref = "href" in svc && svc.href ? svc.href : `/services/${svc.slug}`;
               return (
                 <div
                   key={svc.slug}
@@ -202,7 +213,7 @@ export default function AiDataPage() {
 
                   {/* Link */}
                   <Link
-                    href={`/services/${svc.slug}`}
+                    href={serviceHref}
                     className="inline-flex items-center gap-1.5 text-sm font-semibold transition-colors"
                     style={{ color: "#1ABFAD" }}
                   >
