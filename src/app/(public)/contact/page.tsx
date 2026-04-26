@@ -217,6 +217,7 @@ export default function ContactPage() {
                       <option value="">Select a service...</option>
                       <option value="custom-development">Custom Software Development</option>
                       <option value="mobile-app">Mobile App Development</option>
+                      <option value="agentic-ai-automation">Agentic AI Automation</option>
                       <option value="ai-data">AI & Data Solutions</option>
                       <option value="cloud-infrastructure">Cloud & DevOps</option>
                       <option value="ecommerce">E-Commerce Development</option>
